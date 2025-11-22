@@ -42,8 +42,13 @@ test-coverage: ## Run tests with coverage
 	go tool cover -html=coverage.out -o coverage.html
 
 lint: ## Run linter
-	@echo "Running linter..."
-	golangci-lint run
+	@echo "Running golangci-lint v2..."
+	@golangci-lint --version
+	@golangci-lint run
+
+lint-fix: ## Run linter with auto-fix
+	@echo "Running golangci-lint v2 with auto-fix..."
+	@golangci-lint run --fix
 
 fmt: ## Format Go code
 	@echo "Formatting code..."
@@ -80,7 +85,9 @@ run: build ## Build and run the application
 
 dev-setup: ## Set up development environment
 	@echo "Setting up development environment..."
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@echo "Installing golangci-lint v2..."
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v2.6.2
+	@golangci-lint --version
 
 # Configuration helpers
 config-example: ## Show example configuration

@@ -32,6 +32,18 @@
       ],
       "groupName": "Go modules",
       "automerge": false
+    },
+    {
+      "description": "Update golangci-lint",
+      "matchPackageNames": [
+        "github.com/golangci/golangci-lint"
+      ],
+      "groupName": "golangci-lint",
+      "automerge": false,
+      "labels": [
+        "dependencies",
+        "linting"
+      ]
     }
   ],
   "vulnerability_alerts": {

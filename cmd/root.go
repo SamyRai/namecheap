@@ -3,11 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
-	"namecheap-dns-manager/pkg/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"namecheap-dns-manager/pkg/config"
+	"namecheap-dns-manager/pkg/plugin"
+	"namecheap-dns-manager/pkg/plugin/migadu"
 )
 
 var cfgFile string
@@ -33,7 +34,7 @@ func Execute() error {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
+	cobra.OnInitialize(initConfig, initPlugins)
 
 	// Here you will define your flags and configuration settings.
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.namecheap-dns.yaml)")
@@ -61,7 +62,7 @@ func initConfig() {
 		viper.SetConfigFile(cfgFile)
 	} else {
 		// First try to find config in project directory
-		projectConfigPath := findProjectConfigPath()
+		projectConfigPath := config.FindProjectConfigPath()
 		if projectConfigPath != "" {
 			viper.SetConfigFile(projectConfigPath)
 		} else {
@@ -84,34 +85,12 @@ func initConfig() {
 	}
 }
 
-// findProjectConfigPath looks for config file in the project directory
-func findProjectConfigPath() string {
-	// Get current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
-
-	// Look for config in current directory and parent directories
-	for {
-		configPath := filepath.Join(cwd, "configs", ".namecheap-dns.yaml")
-		if _, err := os.Stat(configPath); err == nil {
-			return configPath
-		}
-
-		// Move up one directory
-		parent := filepath.Dir(cwd)
-		if parent == cwd {
-			break // Reached root
-		}
-		cwd = parent
-	}
-
-	return ""
-}
-
 // GetConfigManager returns a configuration manager instance
 func GetConfigManager() (*config.Manager, error) {
+	// If config file is specified via flag, use it
+	if cfgFile != "" {
+		return config.NewManagerWithPath(cfgFile)
+	}
 	return config.NewManager()
 }
 
@@ -129,4 +108,14 @@ func GetCurrentAccount() (*config.AccountConfig, error) {
 
 	// Otherwise use the current account
 	return configManager.GetCurrentAccount()
+}
+
+// initPlugins registers all built-in plugins
+func initPlugins() {
+	// Register Migadu plugin
+	if err := plugin.Register(migadu.New()); err != nil {
+		// Log error but don't fail - plugins are optional
+		fmt.Fprintf(os.Stderr, "Warning: failed to register Migadu plugin: %v\n", err)
+	}
+	// Add more plugin registrations here as needed
 }

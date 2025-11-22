@@ -22,13 +22,13 @@ type AccountConfig struct {
 type Config struct {
 	Accounts       map[string]*AccountConfig `yaml:"accounts" mapstructure:"accounts"`
 	CurrentAccount string                    `yaml:"current_account" mapstructure:"current_account"`
-	
+
 	// Legacy fields for backward compatibility
 	Username   string `yaml:"username" mapstructure:"username"`
-	APIUser   string `yaml:"api_user" mapstructure:"api_user"`
-	APIKey    string `yaml:"api_key" mapstructure:"api_key"`
-	ClientIP  string `yaml:"client_ip" mapstructure:"client_ip"`
-	UseSandbox bool  `yaml:"use_sandbox" mapstructure:"use_sandbox"`
+	APIUser    string `yaml:"api_user" mapstructure:"api_user"`
+	APIKey     string `yaml:"api_key" mapstructure:"api_key"`
+	ClientIP   string `yaml:"client_ip" mapstructure:"client_ip"`
+	UseSandbox bool   `yaml:"use_sandbox" mapstructure:"use_sandbox"`
 }
 
 // Manager handles configuration operations
@@ -40,11 +40,11 @@ type Manager struct {
 // NewManager creates a new configuration manager
 func NewManager() (*Manager, error) {
 	// First try to find config in project directory
-	projectConfigPath := findProjectConfigPath()
-	
+	projectConfigPath := FindProjectConfigPath()
+
 	// Fall back to home directory if project config not found
 	homeConfigPath := findHomeConfigPath()
-	
+
 	// Determine which config to use
 	var configPath string
 	if projectConfigPath != "" {
@@ -52,7 +52,12 @@ func NewManager() (*Manager, error) {
 	} else {
 		configPath = homeConfigPath
 	}
-	
+
+	return NewManagerWithPath(configPath)
+}
+
+// NewManagerWithPath creates a new configuration manager with a specific config path
+func NewManagerWithPath(configPath string) (*Manager, error) {
 	manager := &Manager{
 		configPath: configPath,
 		config:     &Config{},
@@ -74,32 +79,6 @@ func NewManager() (*Manager, error) {
 	}
 
 	return manager, nil
-}
-
-// findProjectConfigPath looks for config file in the project directory
-func findProjectConfigPath() string {
-	// Get current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
-
-	// Look for config in current directory and parent directories
-	for {
-		configPath := filepath.Join(cwd, "configs", ".namecheap-dns.yaml")
-		if _, err := os.Stat(configPath); err == nil {
-			return configPath
-		}
-
-		// Move up one directory
-		parent := filepath.Dir(cwd)
-		if parent == cwd {
-			break // Reached root
-		}
-		cwd = parent
-	}
-
-	return ""
 }
 
 // findHomeConfigPath returns the home directory config path
@@ -187,7 +166,7 @@ func (m *Manager) AddAccount(name string, account *AccountConfig) error {
 	}
 
 	m.config.Accounts[name] = account
-	
+
 	// Set as current if it's the first account
 	if len(m.config.Accounts) == 1 {
 		m.config.CurrentAccount = name
@@ -293,7 +272,7 @@ func (m *Manager) migrateLegacyConfig() error {
 	// Check if we need to migrate (legacy fields exist and no accounts configured)
 	if (m.config.Username != "" || m.config.APIUser != "" || m.config.APIKey != "" || m.config.ClientIP != "") &&
 		(m.config.Accounts == nil || len(m.config.Accounts) == 0) {
-		
+
 		// Create default account from legacy fields
 		defaultAccount := &AccountConfig{
 			Username:    m.config.Username,

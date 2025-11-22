@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"namecheap-dns-manager/pkg/config"
 	"github.com/spf13/cobra"
+	"namecheap-dns-manager/pkg/config"
 )
 
 // accountCmd represents the account command
@@ -29,16 +29,16 @@ var accountListCmd = &cobra.Command{
 		accounts := configManager.ListAccounts()
 		if len(accounts) == 0 {
 			fmt.Println("No accounts configured.")
-					fmt.Println("Run 'namecheap-dns account add' to add your first account.")
-		return nil
-	}
+			fmt.Println("Run 'namecheap-dns account add' to add your first account.")
+			return nil
+		}
 
-	// Validate that we can access current account
-	if _, err := configManager.GetCurrentAccount(); err != nil {
-		return fmt.Errorf("failed to get current account: %w", err)
-	}
+		// Validate that we can access current account
+		if _, err := configManager.GetCurrentAccount(); err != nil {
+			return fmt.Errorf("failed to get current account: %w", err)
+		}
 
-	fmt.Println("Configured Accounts:")
+		fmt.Println("Configured Accounts:")
 		fmt.Println("====================")
 		fmt.Println()
 
@@ -49,14 +49,14 @@ var accountListCmd = &cobra.Command{
 				continue
 			}
 
-					// Show current account indicator
-		if accountName == configManager.GetCurrentAccountName() {
-			fmt.Printf("→ %s (current)\n", accountName)
-		} else {
-			fmt.Printf("  %s\n", accountName)
-		}
+			// Show current account indicator
+			if accountName == configManager.GetCurrentAccountName() {
+				fmt.Printf("→ %s (current)\n", accountName)
+			} else {
+				fmt.Printf("  %s\n", accountName)
+			}
 
-		fmt.Printf("   Username: %s\n", account.Username)
+			fmt.Printf("   Username: %s\n", account.Username)
 			fmt.Printf("   API User: %s\n", account.APIUser)
 			fmt.Printf("   Client IP: %s\n", account.ClientIP)
 			fmt.Printf("   Sandbox: %t\n", account.UseSandbox)
@@ -131,7 +131,7 @@ var accountAddCmd = &cobra.Command{
 		}
 
 		fmt.Printf("✅ Account '%s' added successfully!\n", accountName)
-		
+
 		// Ask if user wants to switch to this account
 		var switchInput string
 		fmt.Printf("Switch to account '%s'? (Y/n): ", accountName)
@@ -163,7 +163,7 @@ var accountSwitchCmd = &cobra.Command{
 
 		// Check if account exists
 		if _, err := configManager.GetAccount(accountName); err != nil {
-			return fmt.Errorf("account '%s' not found", err)
+			return fmt.Errorf("account '%s' not found: %w", accountName, err)
 		}
 
 		// Get current account for comparison
@@ -203,7 +203,7 @@ var accountRemoveCmd = &cobra.Command{
 
 		// Check if account exists
 		if _, err := configManager.GetAccount(accountName); err != nil {
-			return fmt.Errorf("account '%s' not found", err)
+			return fmt.Errorf("account '%s' not found: %w", accountName, err)
 		}
 
 		// Get current account for comparison
@@ -227,7 +227,7 @@ var accountRemoveCmd = &cobra.Command{
 		}
 
 		fmt.Printf("✅ Account '%s' removed successfully!\n", accountName)
-		
+
 		// Show new current account if it changed
 		if accountName == currentAccount.Username {
 			newCurrent, err := configManager.GetCurrentAccount()
@@ -263,7 +263,7 @@ var accountShowCmd = &cobra.Command{
 		// Get account
 		account, err := configManager.GetAccount(accountName)
 		if err != nil {
-			return fmt.Errorf("account '%s' not found", err)
+			return fmt.Errorf("account '%s' not found: %w", accountName, err)
 		}
 
 		// Display account details
@@ -278,7 +278,7 @@ var accountShowCmd = &cobra.Command{
 
 		fmt.Printf("Username: %s\n", account.Username)
 		fmt.Printf("API User: %s\n", account.APIUser)
-		fmt.Printf("API Key: %s\n", maskAPIKey(account.APIKey))
+		fmt.Printf("API Key: %s\n", config.MaskAPIKey(account.APIKey))
 		fmt.Printf("Client IP: %s\n", account.ClientIP)
 		fmt.Printf("Sandbox: %t\n", account.UseSandbox)
 		if account.Description != "" {
@@ -312,7 +312,7 @@ var accountEditCmd = &cobra.Command{
 		// Get existing account
 		existingAccount, err := configManager.GetAccount(accountName)
 		if err != nil {
-			return fmt.Errorf("account '%s' not found", err)
+			return fmt.Errorf("account '%s' not found: %w", accountName, err)
 		}
 
 		fmt.Printf("Editing account: %s\n", accountName)
@@ -339,7 +339,11 @@ var accountEditCmd = &cobra.Command{
 			account.APIUser = existingAccount.APIUser
 		}
 
-		fmt.Printf("API Key [%s***]: ", existingAccount.APIKey[:min(4, len(existingAccount.APIKey))])
+		masked := existingAccount.APIKey
+		if len(existingAccount.APIKey) > 4 {
+			masked = existingAccount.APIKey[:4]
+		}
+		fmt.Printf("API Key [%s***]: ", masked)
 		fmt.Scanln(&input)
 		if input != "" {
 			account.APIKey = input

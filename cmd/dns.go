@@ -8,7 +8,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
-	"namecheap-dns-manager/pkg/client"
+	"namecheap-dns-manager/internal/cmdutil"
 	"namecheap-dns-manager/pkg/dns"
 )
 
@@ -27,6 +27,12 @@ var dnsListCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domainName := args[0]
+
+		// Validate domain
+		if err := dns.ValidateDomain(domainName); err != nil {
+			return fmt.Errorf("invalid domain: %w", err)
+		}
+
 		recordType, _ := cmd.Flags().GetString("type")
 
 		// Get current account configuration
@@ -35,25 +41,22 @@ var dnsListCmd = &cobra.Command{
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client with current account
-		client, err := client.NewClient(accountConfig)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
-
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		dnsService := dns.NewService(client)
-		
+
 		var records []dns.Record
 		if recordType != "" {
 			records, err = dnsService.GetRecordsByType(domainName, strings.ToUpper(recordType))
 		} else {
 			records, err = dnsService.GetRecords(domainName)
 		}
-		
+
 		if err != nil {
 			return fmt.Errorf("failed to get DNS records: %w", err)
 		}
@@ -76,7 +79,7 @@ var dnsListCmd = &cobra.Command{
 			if record.MXPref > 0 {
 				mxPref = strconv.Itoa(record.MXPref)
 			}
-			
+
 			ttl := ""
 			if record.TTL > 0 {
 				ttl = strconv.Itoa(record.TTL)
@@ -102,7 +105,15 @@ var dnsAddCmd = &cobra.Command{
 		hostname := args[1]
 		recordType := strings.ToUpper(args[2])
 		value := args[3]
-		
+
+		// Validate inputs
+		if err := dns.ValidateDomain(domainName); err != nil {
+			return fmt.Errorf("invalid domain: %w", err)
+		}
+		if err := dns.ValidateHostname(hostname); err != nil {
+			return fmt.Errorf("invalid hostname: %w", err)
+		}
+
 		ttl, _ := cmd.Flags().GetInt("ttl")
 		mxPref, _ := cmd.Flags().GetInt("mx-pref")
 
@@ -112,15 +123,12 @@ var dnsAddCmd = &cobra.Command{
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client with current account
-		client, err := client.NewClient(accountConfig)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
-
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		record := dns.Record{
 			HostName:   hostname,
@@ -131,12 +139,12 @@ var dnsAddCmd = &cobra.Command{
 		}
 
 		dnsService := dns.NewService(client)
-		
+
 		// Validate record
 		if err := dnsService.ValidateRecord(record); err != nil {
 			return fmt.Errorf("invalid record: %w", err)
 		}
-		
+
 		err = dnsService.AddRecord(domainName, record)
 		if err != nil {
 			return fmt.Errorf("failed to add DNS record: %w", err)
@@ -158,7 +166,15 @@ var dnsUpdateCmd = &cobra.Command{
 		hostname := args[1]
 		recordType := strings.ToUpper(args[2])
 		newValue := args[3]
-		
+
+		// Validate inputs
+		if err := dns.ValidateDomain(domainName); err != nil {
+			return fmt.Errorf("invalid domain: %w", err)
+		}
+		if err := dns.ValidateHostname(hostname); err != nil {
+			return fmt.Errorf("invalid hostname: %w", err)
+		}
+
 		ttl, _ := cmd.Flags().GetInt("ttl")
 		mxPref, _ := cmd.Flags().GetInt("mx-pref")
 
@@ -168,15 +184,12 @@ var dnsUpdateCmd = &cobra.Command{
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client with current account
-		client, err := client.NewClient(accountConfig)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
-
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		newRecord := dns.Record{
 			HostName:   hostname,
@@ -187,12 +200,12 @@ var dnsUpdateCmd = &cobra.Command{
 		}
 
 		dnsService := dns.NewService(client)
-		
+
 		// Validate record
 		if err := dnsService.ValidateRecord(newRecord); err != nil {
 			return fmt.Errorf("invalid record: %w", err)
 		}
-		
+
 		err = dnsService.UpdateRecord(domainName, hostname, recordType, newRecord)
 		if err != nil {
 			return fmt.Errorf("failed to update DNS record: %w", err)
@@ -220,15 +233,12 @@ var dnsDeleteCmd = &cobra.Command{
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client with current account
-		client, err := client.NewClient(accountConfig)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
-
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		dnsService := dns.NewService(client)
 		err = dnsService.DeleteRecord(domainName, hostname, recordType)
@@ -249,7 +259,12 @@ var dnsClearCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domainName := args[0]
-		
+
+		// Validate domain
+		if err := dns.ValidateDomain(domainName); err != nil {
+			return fmt.Errorf("invalid domain: %w", err)
+		}
+
 		confirm, _ := cmd.Flags().GetBool("confirm")
 		if !confirm {
 			fmt.Printf("This will delete ALL DNS records for %s. Use --confirm to proceed.\n", domainName)
@@ -262,15 +277,12 @@ var dnsClearCmd = &cobra.Command{
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client with current account
-		client, err := client.NewClient(accountConfig)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
-
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		dnsService := dns.NewService(client)
 		err = dnsService.DeleteAllRecords(domainName)
@@ -323,7 +335,7 @@ operations:
 		// 1. Reading and parsing the YAML file
 		// 2. Converting to BulkOperation structs
 		// 3. Calling dnsService.BulkUpdate()
-		
+
 		return fmt.Errorf("bulk operations not yet implemented - TODO: parse %s and apply to %s", operationsFile, domainName)
 	},
 }
@@ -353,7 +365,7 @@ var dnsImportCmd = &cobra.Command{
 		// 1. Parsing the zone file format
 		// 2. Converting to DNS records
 		// 3. Setting all records at once
-		
+
 		return fmt.Errorf("zone file import not yet implemented - TODO: parse %s and import to %s", zoneFile, domainName)
 	},
 }
@@ -377,15 +389,12 @@ var dnsExportCmd = &cobra.Command{
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client with current account
-		client, err := client.NewClient(accountConfig)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
-
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		dnsService := dns.NewService(client)
 		records, err := dnsService.GetRecords(domainName)
@@ -397,14 +406,14 @@ var dnsExportCmd = &cobra.Command{
 		// This would involve:
 		// 1. Converting records to zone file format
 		// 2. Writing to file or stdout
-		
+
 		fmt.Printf("Export %d records from %s", len(records), domainName)
 		if outputFile != "" {
 			fmt.Printf(" to %s", outputFile)
 		}
 		fmt.Println()
 		fmt.Println("TODO: Implement zone file export")
-		
+
 		return nil
 	},
 }

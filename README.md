@@ -17,7 +17,7 @@ A comprehensive command-line interface for managing Namecheap domains and DNS re
 
 ```bash
 # Clone the repository
-git clone https://github.com/damirmukimov/namecheap.git
+git clone https://github.com/SamyRai/namecheap.git
 cd namecheap
 
 # Build the binary

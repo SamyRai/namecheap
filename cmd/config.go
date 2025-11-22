@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
+	"namecheap-dns-manager/pkg/config"
 )
 
 // configCmd represents the config command
@@ -68,7 +69,11 @@ var configSetCmd = &cobra.Command{
 		// API Key
 		fmt.Print("API Key")
 		if apiKey != "" {
-			fmt.Printf(" [%s***]", apiKey[:min(4, len(apiKey))])
+			masked := apiKey
+			if len(apiKey) > 4 {
+				masked = apiKey[:4]
+			}
+			fmt.Printf(" [%s***]", masked)
 		}
 		fmt.Print(": ")
 		fmt.Scanln(&input)
@@ -120,15 +125,15 @@ var configShowCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Current Configuration:")
 		fmt.Println("=====================")
-		
+
 		if configFile := viper.ConfigFileUsed(); configFile != "" {
 			fmt.Printf("Config file: %s\n", configFile)
 		} else {
 			fmt.Println("No config file found")
 		}
-		
+
 		fmt.Println()
-		
+
 		username := viper.GetString("username")
 		apiUser := getStringWithFallback("api-user", "api_user")
 		apiKey := getStringWithFallback("api-key", "api_key")
@@ -137,7 +142,7 @@ var configShowCmd = &cobra.Command{
 
 		fmt.Printf("Username: %s\n", getValueOrEmpty(username))
 		fmt.Printf("API User: %s\n", getValueOrEmpty(apiUser))
-		fmt.Printf("API Key: %s\n", maskAPIKey(apiKey))
+		fmt.Printf("API Key: %s\n", config.MaskAPIKey(apiKey))
 		fmt.Printf("Client IP: %s\n", getValueOrEmpty(clientIP))
 		fmt.Printf("Sandbox: %t\n", sandbox)
 
@@ -180,11 +185,11 @@ var configInitCmd = &cobra.Command{
 
 		// Create example config
 		config := map[string]interface{}{
-			"username":     "your-namecheap-username",
-			"api_user":     "your-api-username",
-			"api_key":      "your-api-key",
-			"client_ip":    "your.public.ip.address",
-			"use_sandbox":  false,
+			"username":    "your-namecheap-username",
+			"api_user":    "your-api-username",
+			"api_key":     "your-api-key",
+			"client_ip":   "your.public.ip.address",
+			"use_sandbox": false,
 		}
 
 		data, err := yaml.Marshal(config)
@@ -200,7 +205,7 @@ var configInitCmd = &cobra.Command{
 		fmt.Printf("Configuration file created at %s\n", configPath)
 		fmt.Println("Please edit the file with your actual values, then run:")
 		fmt.Println("  namecheap-dns config show")
-		
+
 		return nil
 	},
 }
@@ -236,11 +241,11 @@ var configValidateCmd = &cobra.Command{
 
 		// Test API connection
 		fmt.Println("Testing API connection...")
-		
+
 		// TODO: Implement actual API test
 		// This would involve creating a client and making a simple API call
 		// For now, just validate the configuration format
-		
+
 		fmt.Println("✅ Configuration appears valid")
 		fmt.Println()
 		fmt.Println("Note: Run 'namecheap-dns domain list' to test the actual API connection.")
@@ -276,23 +281,6 @@ func getValueOrEmpty(value string) string {
 		return "(not set)"
 	}
 	return value
-}
-
-func maskAPIKey(apiKey string) string {
-	if apiKey == "" {
-		return "(not set)"
-	}
-	if len(apiKey) <= 8 {
-		return "***"
-	}
-	return apiKey[:4] + "***" + apiKey[len(apiKey)-4:]
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // getStringWithFallback tries the primary key first, then falls back to the alternative
