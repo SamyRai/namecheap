@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/SamyRai/namecheap/wiki
+    about: Check the wiki for documentation and guides
+  - name: Discussions
+    url: https://github.com/SamyRai/namecheap/discussions
+    about: Ask questions and discuss ideas
+
