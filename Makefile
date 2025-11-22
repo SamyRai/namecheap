@@ -94,6 +94,19 @@ config-example: ## Show example configuration
 	@echo "Example configuration:"
 	@cat configs/config.example.yaml
 
+# Version
+version: ## Show current version
+	@echo "Current version: $$(grep 'Version = ' pkg/version/version.go | sed 's/.*Version = "\(.*\)"/\1/')"
+
+version-bump-patch: ## Bump patch version (0.1.0 -> 0.1.1)
+	@./scripts/bump-version.sh patch
+
+version-bump-minor: ## Bump minor version (0.1.0 -> 0.2.0)
+	@./scripts/bump-version.sh minor
+
+version-bump-major: ## Bump major version (0.1.0 -> 1.0.0)
+	@./scripts/bump-version.sh major
+
 # Release
 release-check: lint test ## Check if ready for release
 	@echo "Release checks passed!"

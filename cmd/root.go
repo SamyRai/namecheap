@@ -9,6 +9,7 @@ import (
 	"namecheap-dns-manager/pkg/config"
 	"namecheap-dns-manager/pkg/plugin"
 	"namecheap-dns-manager/pkg/plugin/migadu"
+	"namecheap-dns-manager/pkg/version"
 )
 
 var cfgFile string
@@ -24,7 +25,11 @@ This tool allows you to:
 - Create, update, and delete DNS records
 - Bulk operations on DNS records
 - Domain registration and management
-- Manage multiple Namecheap accounts`,
+- Manage multiple Namecheap accounts
+
+⚠️  WARNING: This is NOT an official Namecheap tool. Use at your own risk.
+Current version: ` + version.Version + ` (pre-1.0.0)`,
+	Version: version.String(),
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

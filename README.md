@@ -2,6 +2,23 @@
 
 A command-line interface for managing Namecheap domains and DNS records with **multi-account support**.
 
+## ⚠️ Disclaimer
+
+**This is NOT an official Namecheap tool.** This is an independent, community-maintained project.
+
+**Current Status: Pre-1.0.0 Release**
+
+This tool is currently in active development and has not reached version 1.0.0. As such:
+
+- ⚠️ **Use at your own risk and responsibility**
+- ⚠️ **No warranties or guarantees are provided**
+- ⚠️ **The API may change between versions**
+- ⚠️ **Always test in a sandbox environment first**
+- ⚠️ **Backup your DNS records before making bulk changes**
+- ⚠️ **Review changes carefully before applying them**
+
+The maintainers are not responsible for any data loss, service disruption, or other issues that may arise from using this tool. Please report bugs and contribute improvements via GitHub issues and pull requests.
+
 ## 🎯 Features
 
 - **Multi-Account Management**: Configure and switch between multiple Namecheap accounts
