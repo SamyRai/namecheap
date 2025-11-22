@@ -33,7 +33,7 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
-      
+
       - name: Build binaries
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -43,7 +43,7 @@ jobs:
         run: |
           mkdir -p dist
           LDFLAGS="-w -s -X namecheap-dns-manager/pkg/version.Version=${{ steps.version.outputs.version }} -X namecheap-dns-manager/pkg/version.BuildDate=${{ github.event.head_commit.timestamp }} -X namecheap-dns-manager/pkg/version.GitCommit=${{ github.sha }} -X namecheap-dns-manager/pkg/version.GitTag=${{ github.ref_name }}"
-          
+
           GOOS=linux GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/namecheap-dns-linux-amd64 ./main.go
           GOOS=linux GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/namecheap-dns-linux-arm64 ./main.go
           GOOS=darwin GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/namecheap-dns-darwin-amd64 ./main.go
@@ -66,7 +66,7 @@ jobs:
             echo "prerelease=false" >> $GITHUB_OUTPUT
             echo "This is a stable release"
           fi
-      
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
