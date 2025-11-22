@@ -1,0 +1,76 @@
+# golangci-lint v2 configuration for 2025
+# Modern, production-ready configuration
+
+version: "2"
+
+# Run configuration
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+  allow-parallel-runners: true
+
+# Linters configuration
+linters:
+  # Use standard set of linters (recommended for most projects)
+  default: standard
+
+  # Enable additional linters that are available in v2
+  enable:
+    # Code quality
+    - errcheck          # Check for unchecked errors
+    - govet             # Reports suspicious constructs
+    - ineffassign       # Detects ineffectual assignments
+    - staticcheck       # Static analysis
+    - unused            # Checks for unused constants, variables, functions and types
+
+    # Style
+    - misspell          # Finds commonly misspelled English words
+    - revive            # Fast, configurable, extensible linter
+
+    # Performance
+    - prealloc          # Finds slice declarations that could be pre-allocated
+
+    # Security
+    - gosec             # Inspects source code for security problems
+
+    # Complexity
+    - gocyclo           # Computes and checks the cyclomatic complexity
+    - gocognit          # Computes and checks the cognitive complexity
+
+    # Best practices
+    - gocritic          # The most opinionated Go source code linter
+    - goconst           # Finds repeated strings that could be replaced by a constant
+    - goprintffuncname  # Checks that printf-like functions are named with f at the end
+    - nakedret          # Finds naked returns in functions greater than a specified length
+    - noctx             # Finds sending http request without context.Context
+    - nolintlint        # Analyzes //nolint directives
+    - rowserrcheck      # Checks whether rows.Err() is checked
+    - sqlclosecheck     # Checks that sql.Rows and sql.Stmt are closed
+    - thelper           # Detects test helpers without t.Helper() call
+    - unconvert         # Remove unnecessary type conversions
+    - unparam           # Reports unused function parameters
+    - wastedassign      # Finds wasted assignment statements
+
+# Issues configuration
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
+  new-from-patch: ""
+  # Note: Use //nolint comments for acceptable cases like interactive CLI input/output
+
+# Severity configuration
+severity:
+  default: error
+  rules:
+    - linters:
+        - errcheck
+        - gosec
+      severity: error
+    - linters:
+        - revive
+      severity: warning
+    - linters:
+        - misspell
+      severity: warning

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"namecheap-dns-manager/pkg/client"
+	"namecheap-dns-manager/internal/cmdutil"
 	"namecheap-dns-manager/pkg/dns"
 )
 
@@ -33,10 +33,18 @@ This will add:
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		replace, _ := cmd.Flags().GetBool("replace")
 
-		client, err := client.NewClientFromViper()
+		// Get current account configuration
+		accountConfig, err := GetCurrentAccount()
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
+
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
+		if err != nil {
+			return err
+		}
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		dnsService := dns.NewService(client)
 
@@ -176,7 +184,7 @@ This will add:
 		fmt.Println("2. Verify domain ownership in Migadu dashboard")
 		fmt.Println("3. Create email accounts in Migadu")
 		fmt.Println("4. Test email sending/receiving")
-		
+
 		return nil
 	},
 }
@@ -190,10 +198,18 @@ var migaduVerifyCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domainName := args[0]
 
-		client, err := client.NewClientFromViper()
+		// Get current account configuration
+		accountConfig, err := GetCurrentAccount()
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
+
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
+		if err != nil {
+			return err
+		}
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		dnsService := dns.NewService(client)
 		records, err := dnsService.GetRecords(domainName)
@@ -206,11 +222,11 @@ var migaduVerifyCmd = &cobra.Command{
 
 		// Required records for verification
 		requiredChecks := []struct {
-			name        string
-			hostname    string
-			recordType  string
-			valueCheck  func(string) bool
-			found       bool
+			name       string
+			hostname   string
+			recordType string
+			valueCheck func(string) bool
+			found      bool
 		}{
 			{
 				name:       "MX Record (Primary)",
@@ -331,10 +347,18 @@ var migaduRemoveCmd = &cobra.Command{
 			return nil
 		}
 
-		client, err := client.NewClientFromViper()
+		// Get current account configuration
+		accountConfig, err := GetCurrentAccount()
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
+
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
+		if err != nil {
+			return err
+		}
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		dnsService := dns.NewService(client)
 		records, err := dnsService.GetRecords(domainName)
@@ -381,6 +405,8 @@ var migaduRemoveCmd = &cobra.Command{
 }
 
 func init() {
+	// Migadu is now available as a plugin via: namecheap-dns plugin migadu <command> <domain>
+	// Keeping this for backward compatibility, but it's deprecated
 	rootCmd.AddCommand(migaduCmd)
 	migaduCmd.AddCommand(migaduSetupCmd)
 	migaduCmd.AddCommand(migaduVerifyCmd)

@@ -6,7 +6,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
-	"namecheap-dns-manager/pkg/client"
+	"namecheap-dns-manager/internal/cmdutil"
 	"namecheap-dns-manager/pkg/domain"
 )
 
@@ -29,15 +29,12 @@ var domainListCmd = &cobra.Command{
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client with current account
-		client, err := client.NewClient(accountConfig)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
-
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		domainService := domain.NewService(client)
 		domains, err := domainService.ListDomains()
@@ -86,21 +83,23 @@ var domainInfoCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domainName := args[0]
 
+		// Validate domain
+		if err := domain.ValidateDomain(domainName); err != nil {
+			return fmt.Errorf("invalid domain: %w", err)
+		}
+
 		// Get current account configuration
 		accountConfig, err := GetCurrentAccount()
 		if err != nil {
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client with current account
-		client, err := client.NewClient(accountConfig)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
-
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		domainService := domain.NewService(client)
 		domainInfo, err := domainService.GetDomainInfo(domainName)
@@ -131,21 +130,23 @@ var domainCheckCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domainName := args[0]
 
+		// Validate domain
+		if err := domain.ValidateDomain(domainName); err != nil {
+			return fmt.Errorf("invalid domain: %w", err)
+		}
+
 		// Get current account configuration
 		accountConfig, err := GetCurrentAccount()
 		if err != nil {
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client with current account
-		client, err := client.NewClient(accountConfig)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
-
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		domainService := domain.NewService(client)
 		available, err := domainService.CheckAvailability(domainName)
@@ -179,21 +180,23 @@ var domainNameserversGetCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domainName := args[0]
 
+		// Validate domain
+		if err := domain.ValidateDomain(domainName); err != nil {
+			return fmt.Errorf("invalid domain: %w", err)
+		}
+
 		// Get current account configuration
 		accountConfig, err := GetCurrentAccount()
 		if err != nil {
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client with current account
-		client, err := client.NewClient(accountConfig)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
-
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		domainService := domain.NewService(client)
 		nameservers, err := domainService.GetNameservers(domainName)
@@ -226,15 +229,12 @@ var domainNameserversSetCmd = &cobra.Command{
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client with current account
-		client, err := client.NewClient(accountConfig)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
-
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		domainService := domain.NewService(client)
 		err = domainService.SetNameservers(domainName, nameservers)
@@ -260,21 +260,23 @@ var domainNameserversDefaultCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domainName := args[0]
 
+		// Validate domain
+		if err := domain.ValidateDomain(domainName); err != nil {
+			return fmt.Errorf("invalid domain: %w", err)
+		}
+
 		// Get current account configuration
 		accountConfig, err := GetCurrentAccount()
 		if err != nil {
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client with current account
-		client, err := client.NewClient(accountConfig)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
-
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		domainService := domain.NewService(client)
 		err = domainService.SetToNamecheapDNS(domainName)
@@ -310,15 +312,12 @@ var domainRenewCmd = &cobra.Command{
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client with current account
-		client, err := client.NewClient(accountConfig)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
+			return err
 		}
-
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		cmdutil.DisplayAccountInfo(accountConfig)
 
 		domainService := domain.NewService(client)
 		err = domainService.RenewDomain(domainName, years)
