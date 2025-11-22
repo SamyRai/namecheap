@@ -1,36 +1,57 @@
 # Namecheap DNS Manager
 
+<div align="center">
+
+![Version](https://img.shields.io/badge/version-0.1.0-blue?style=flat-square)
+![Status](https://img.shields.io/badge/status-pre--1.0.0-orange?style=flat-square)
+![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go)
+![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+
 A command-line interface for managing Namecheap domains and DNS records with **multi-account support**.
+
+[Installation](#-quick-start) • [Documentation](https://github.com/SamyRai/namecheap/wiki) • [Issues](https://github.com/SamyRai/namecheap/issues) • [Releases](https://github.com/SamyRai/namecheap/releases)
+
+</div>
+
+---
 
 ## ⚠️ Disclaimer
 
-**This is NOT an official Namecheap tool.** This is an independent, community-maintained project.
-
-**Current Status: Pre-1.0.0 Release (v0.1.0)**
-
-This tool is currently in active development and has **not reached version 1.0.0**. As such:
-
-- ⚠️ **Use at your own risk and responsibility**
-- ⚠️ **No warranties or guarantees are provided**
-- ⚠️ **The API may change between versions**
-- ⚠️ **Always test in a sandbox environment first**
-- ⚠️ **Backup your DNS records before making bulk changes**
-- ⚠️ **Review changes carefully before applying them**
-
-The maintainers are not responsible for any data loss, service disruption, or other issues that may arise from using this tool. Please report bugs and contribute improvements via GitHub issues and pull requests.
-
-For version information and release notes, see [VERSIONING.md](VERSIONING.md).
+> **Warning**
+> 
+> **This is NOT an official Namecheap tool.** This is an independent, community-maintained project.
+> 
+> **Current Status: Pre-1.0.0 Release (v0.1.0)**
+> 
+> This tool is currently in active development and has **not reached version 1.0.0**. As such:
+> 
+> - ⚠️ **Use at your own risk and responsibility**
+> - ⚠️ **No warranties or guarantees are provided**
+> - ⚠️ **The API may change between versions**
+> - ⚠️ **Always test in a sandbox environment first**
+> - ⚠️ **Backup your DNS records before making bulk changes**
+> - ⚠️ **Review changes carefully before applying them**
+> 
+> The maintainers are not responsible for any data loss, service disruption, or other issues that may arise from using this tool. Please report bugs and contribute improvements via GitHub issues and pull requests.
+> 
+> For version information and release notes, see [VERSIONING.md](VERSIONING.md).
 
 ## 🎯 Features
 
-- **Multi-Account Management**: Configure and switch between multiple Namecheap accounts
-- **Domain Management**: List, check, and manage your domains
-- **DNS Management**: Create, update, and delete DNS records
-- **Bulk Operations**: Perform multiple DNS operations at once
-- **Account Switching**: Easy switching between different accounts
-- **Secure Configuration**: API keys and credentials stored securely
+| Feature | Description |
+|---------|-------------|
+| 🔐 **Multi-Account Management** | Configure and switch between multiple Namecheap accounts |
+| 🌐 **Domain Management** | List, check, and manage your domains |
+| 📝 **DNS Management** | Create, update, and delete DNS records |
+| ⚡ **Bulk Operations** | Perform multiple DNS operations at once |
+| 🔄 **Account Switching** | Easy switching between different accounts |
+| 🔌 **Plugin System** | Extensible plugin architecture for custom functionality |
+| 🔒 **Secure Configuration** | API keys and credentials stored securely |
 
 ## 🚀 Quick Start
+
+<details>
+<summary><strong>Click to expand quick start guide</strong></summary>
 
 ### 1. Installation
 
@@ -40,123 +61,94 @@ git clone https://github.com/SamyRai/namecheap.git
 cd namecheap
 
 # Build the binary
-go build -o namecheap-dns cmd/main.go
-
-# Or use make
 make build
+
+# Or build directly
+go build -o namecheap-dns ./main.go
 ```
 
 ### 2. Configuration
 
-The tool automatically looks for configuration files in this order:
-1. **Project directory**: `./configs/.namecheap-dns.yaml` (recommended for development)
-2. **Home directory**: `~/.namecheap-dns.yaml` (fallback)
+The tool automatically detects configuration files in this priority order:
 
-#### Initialize Configuration
+| Priority | Location | Use Case |
+|----------|----------|----------|
+| **1** | `./configs/.namecheap-dns.yaml` | 🛠️ Development |
+| **2** | `~/.namecheap-dns.yaml` | 🏠 Production |
 
 ```bash
-# Create a new configuration file
+# Initialize configuration
 ./namecheap-dns config init
 
-# Or manually create configs/.namecheap-dns.yaml
-```
-
-#### Example Configuration
-
-```yaml
-# configs/.namecheap-dns.yaml
-accounts:
-  default:
-    username: "your-namecheap-username"
-    api_user: "your-api-username"
-    api_key: "your-api-key-here"
-    client_ip: "your.public.ip.address"
-    use_sandbox: false
-    description: "My main account"
-
-  work:
-    username: "work-username"
-    api_user: "work-api-username"
-    api_key: "work-api-key"
-    client_ip: "your.public.ip.address"
-    use_sandbox: false
-    description: "Work account"
-
-current_account: "default"
-```
-
-### 3. Add Your First Account
-
-```bash
-# Add an account interactively
+# Or add account interactively
 ./namecheap-dns account add
-
-# Or add with a specific name
-./namecheap-dns account add personal
 ```
 
-### 4. Test Your Setup
+### 3. Test Your Setup
 
 ```bash
-# List all accounts
+# List accounts
 ./namecheap-dns account list
 
-# Show current account
-./namecheap-dns account show
-
-# List domains (using current account)
+# List domains
 ./namecheap-dns domain list
 
-# Use a specific account for a command
+# Use specific account
 ./namecheap-dns --account work domain list
 ```
 
+</details>
+
+> **📚 For detailed documentation, see the [Wiki](https://github.com/SamyRai/namecheap/wiki)**
+
 ## 📋 Commands
 
-### Account Management
+<details>
+<summary><strong>Account Management</strong></summary>
 
-```bash
-./namecheap-dns account list                    # List all accounts
-./namecheap-dns account add [name]              # Add new account
-./namecheap-dns account switch <name>           # Switch to account
-./namecheap-dns account show [name]             # Show account details
-./namecheap-dns account edit [name]             # Edit account
-./namecheap-dns account remove <name>           # Remove account
-```
+| Command | Description |
+|---------|-------------|
+| `account list` | List all accounts |
+| `account add [name]` | Add new account |
+| `account switch <name>` | Switch to account |
+| `account show [name]` | Show account details |
+| `account edit [name]` | Edit account |
+| `account remove <name>` | Remove account |
 
-### Domain Management
+</details>
 
-```bash
-./namecheap-dns domain list                     # List all domains
-./namecheap-dns domain info <domain>            # Get domain details
-./namecheap-dns domain check <domain>           # Check availability
-./namecheap-dns domain renew <domain> [years]   # Renew domain
-./namecheap-dns domain nameservers get <domain> # Get nameservers
-./namecheap-dns domain nameservers set <domain> <ns1> [ns2] [ns3] [ns4]
-./namecheap-dns domain nameservers default <domain>
-```
+<details>
+<summary><strong>Domain Management</strong></summary>
 
-### DNS Management
+| Command | Description |
+|---------|-------------|
+| `domain list` | List all domains |
+| `domain info <domain>` | Get domain details |
+| `domain check <domain>` | Check availability |
+| `domain renew <domain> [years]` | Renew domain |
+| `domain nameservers get <domain>` | Get nameservers |
+| `domain nameservers set <domain> <ns1> [ns2]...` | Set nameservers |
+| `domain nameservers default <domain>` | Reset to default |
 
-```bash
-./namecheap-dns dns list <domain>               # List DNS records
-./namecheap-dns dns add <domain> <host> <type> <value>
-./namecheap-dns dns update <domain> <host> <type> <value>
-./namecheap-dns dns delete <domain> <host> <type>
-./namecheap-dns dns clear <domain>              # Clear all records
-./namecheap-dns dns bulk <domain> <file>        # Bulk operations
-./namecheap-dns dns import <domain> <file>      # Import zone file
-./namecheap-dns dns export <domain> [file]      # Export zone file
-```
+</details>
 
-### Configuration (Legacy)
+<details>
+<summary><strong>DNS Management</strong></summary>
 
-```bash
-./namecheap-dns config init                      # Initialize config
-./namecheap-dns config set                       # Set config interactively
-./namecheap-dns config show                      # Show current config
-./namecheap-dns config validate                  # Validate config
-```
+| Command | Description |
+|---------|-------------|
+| `dns list <domain>` | List DNS records |
+| `dns add <domain> <host> <type> <value>` | Add DNS record |
+| `dns update <domain> <host> <type> <value>` | Update DNS record |
+| `dns delete <domain> <host> <type>` | Delete DNS record |
+| `dns clear <domain>` | Clear all records |
+| `dns bulk <domain> <file>` | Bulk operations |
+| `dns import <domain> <file>` | Import zone file |
+| `dns export <domain> [file]` | Export zone file |
+
+</details>
+
+> **📖 For complete command reference, see [Usage Guide](https://github.com/SamyRai/namecheap/wiki/Usage)**
 
 ## 🔐 Security
 
