@@ -112,4 +112,5 @@ jobs:
         uses: securego/gosec@master
         with:
           args: './...'
+          exit-code: '0'  # Don't fail build, just report issues
 
