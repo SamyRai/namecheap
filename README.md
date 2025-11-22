@@ -6,9 +6,9 @@ A command-line interface for managing Namecheap domains and DNS records with **m
 
 **This is NOT an official Namecheap tool.** This is an independent, community-maintained project.
 
-**Current Status: Pre-1.0.0 Release**
+**Current Status: Pre-1.0.0 Release (v0.1.0)**
 
-This tool is currently in active development and has not reached version 1.0.0. As such:
+This tool is currently in active development and has **not reached version 1.0.0**. As such:
 
 - ⚠️ **Use at your own risk and responsibility**
 - ⚠️ **No warranties or guarantees are provided**
@@ -18,6 +18,8 @@ This tool is currently in active development and has not reached version 1.0.0. 
 - ⚠️ **Review changes carefully before applying them**
 
 The maintainers are not responsible for any data loss, service disruption, or other issues that may arise from using this tool. Please report bugs and contribute improvements via GitHub issues and pull requests.
+
+For version information and release notes, see [VERSIONING.md](VERSIONING.md).
 
 ## 🎯 Features
 
