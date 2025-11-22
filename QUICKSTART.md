@@ -9,7 +9,7 @@ A CLI tool for managing Namecheap domains and DNS records with Migadu email host
 ✅ **Domain Management**
 
 - List all domains with details
-- Check domain availability  
+- Check domain availability
 - Get domain information
 - Manage nameservers
 - Domain renewal
