@@ -18,37 +18,37 @@ A command-line interface for managing Namecheap domains and DNS records with **m
 ## ⚠️ Disclaimer
 
 > **Warning**
-> 
+>
 > **This is NOT an official Namecheap tool.** This is an independent, community-maintained project.
-> 
+>
 > **Current Status: Pre-1.0.0 Release (v0.1.0)**
-> 
+>
 > This tool is currently in active development and has **not reached version 1.0.0**. As such:
-> 
+>
 > - ⚠️ **Use at your own risk and responsibility**
 > - ⚠️ **No warranties or guarantees are provided**
 > - ⚠️ **The API may change between versions**
 > - ⚠️ **Always test in a sandbox environment first**
 > - ⚠️ **Backup your DNS records before making bulk changes**
 > - ⚠️ **Review changes carefully before applying them**
-> 
+>
 > The maintainers are not responsible for any data loss, service disruption, or other issues that may arise from using this tool. Please report bugs and contribute improvements via GitHub issues and pull requests.
-> 
+>
 > For version information and release notes, see [VERSIONING.md](VERSIONING.md).
 
-## 🎯 Features
+## Features
 
 | Feature | Description |
 |---------|-------------|
-| 🔐 **Multi-Account Management** | Configure and switch between multiple Namecheap accounts |
-| 🌐 **Domain Management** | List, check, and manage your domains |
-| 📝 **DNS Management** | Create, update, and delete DNS records |
-| ⚡ **Bulk Operations** | Perform multiple DNS operations at once |
-| 🔄 **Account Switching** | Easy switching between different accounts |
-| 🔌 **Plugin System** | Extensible plugin architecture for custom functionality |
-| 🔒 **Secure Configuration** | API keys and credentials stored securely |
+| **Multi-Account Management** | Configure and switch between multiple Namecheap accounts |
+| **Domain Management** | List, check, and manage your domains |
+| **DNS Management** | Create, update, and delete DNS records |
+| **Bulk Operations** | Perform multiple DNS operations at once |
+| **Account Switching** | Easy switching between different accounts |
+| **Plugin System** | Extensible plugin architecture for custom functionality |
+| **Secure Configuration** | API keys and credentials stored securely |
 
-## 🚀 Quick Start
+## Quick Start
 
 <details>
 <summary><strong>Click to expand quick start guide</strong></summary>
@@ -99,9 +99,9 @@ The tool automatically detects configuration files in this priority order:
 
 </details>
 
-> **📚 For detailed documentation, see the [Wiki](https://github.com/SamyRai/namecheap/wiki)**
+> **For detailed documentation, see the [Wiki](https://github.com/SamyRai/namecheap/wiki)**
 
-## 📋 Commands
+## Commands
 
 <details>
 <summary><strong>Account Management</strong></summary>
@@ -148,16 +148,16 @@ The tool automatically detects configuration files in this priority order:
 
 </details>
 
-> **📖 For complete command reference, see [Usage Guide](https://github.com/SamyRai/namecheap/wiki/Usage)**
+> **For complete command reference, see [Usage Guide](https://github.com/SamyRai/namecheap/wiki/Usage)**
 
-## 🔐 Security
+## Security
 
 - Configuration files use `600` permissions (owner read/write only)
 - API keys are masked in output
 - Configuration files are excluded from git by default
 - Sensitive data is encrypted in memory
 
-## 📁 Configuration File Locations
+## Configuration File Locations
 
 The tool automatically detects configuration files in this priority order:
 
@@ -172,7 +172,7 @@ The tool automatically detects configuration files in this priority order:
 3. **Custom Location**:
    - `./namecheap-dns --config /path/to/config.yaml`
 
-## 💡 Pro Tips
+## Pro Tips
 
 ### Multi-Account Workflow
 
@@ -201,7 +201,7 @@ The tool automatically detects configuration files in this priority order:
 - Keep related domains in the same account
 - Use sandbox accounts for testing
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -230,11 +230,11 @@ The tool automatically detects configuration files in this priority order:
 ./namecheap-dns dns --help
 ```
 
-## 🔄 Migration from Legacy Config
+## Migration from Legacy Config
 
 If you have an existing single-account configuration, the tool will automatically migrate it to the new multi-account format. Your existing configuration will be preserved as the `default` account.
 
-## 📝 Development
+## Development
 
 ### Project Structure
 
@@ -264,11 +264,11 @@ make build
 make install
 ```
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -276,7 +276,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 4. Add tests if applicable
 5. Submit a pull request
 
-## 📞 Support
+## Support
 
 For issues and questions:
 - Check the troubleshooting section above
