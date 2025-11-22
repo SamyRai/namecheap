@@ -136,7 +136,7 @@ The `Context` provided to plugin commands includes:
 - `Flags` - Command flags (dry-run, replace, confirm, etc.)
 - `Output` - Output writer for displaying messages
 
-## Best Practices
+## Practices
 
 1. **Validate Input**: Always validate domain names and other inputs
 2. **Dry Run Support**: Support `--dry-run` flag to preview changes

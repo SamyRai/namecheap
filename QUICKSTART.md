@@ -2,7 +2,7 @@
 
 ## What's Been Built
 
-A comprehensive CLI tool for managing Namecheap domains and DNS records with special Migadu email hosting integration.
+A CLI tool for managing Namecheap domains and DNS records with Migadu email hosting integration.
 
 ## Key Features Implemented
 

@@ -18,7 +18,7 @@ var accountName string
 var rootCmd = &cobra.Command{
 	Use:   "namecheap-dns",
 	Short: "A CLI tool for managing Namecheap domains and DNS records",
-	Long: `A comprehensive command-line interface for managing Namecheap domains and DNS records.
+	Long: `A command-line interface for managing Namecheap domains and DNS records.
 This tool allows you to:
 - List and manage your domains
 - Create, update, and delete DNS records

@@ -9,8 +9,8 @@ import (
 // helpCmd represents the help command
 var helpCmd = &cobra.Command{
 	Use:   "help",
-	Short: "Show comprehensive help and examples",
-	Long:  `Show comprehensive help information including multi-account usage examples.`,
+	Short: "Show help and examples",
+	Long:  `Show help information including multi-account usage examples.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Namecheap DNS Manager - Multi-Account CLI Tool")
 		fmt.Println("==============================================")
