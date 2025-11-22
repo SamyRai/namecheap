@@ -1,0 +1,117 @@
+name: Version Management
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version type (major, minor, patch)'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  bump-version:
+    name: Bump Version
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Get current version
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(grep 'Version = ' pkg/version/version.go | sed 's/.*Version = "\(.*\)"/\1/')
+          echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+      
+      - name: Calculate new version
+        id: new_version
+        run: |
+          CURRENT="${{ steps.current_version.outputs.current }}"
+          TYPE="${{ github.event.inputs.version_type }}"
+          
+          IFS='.' read -r -a PARTS <<< "$CURRENT"
+          MAJOR="${PARTS[0]}"
+          MINOR="${PARTS[1]}"
+          PATCH="${PARTS[2]}"
+          
+          case "$TYPE" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+          
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "new=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+      
+      - name: Update version in code
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.new }}"
+          sed -i "s/Version = \".*\"/Version = \"$NEW_VERSION\"/" pkg/version/version.go
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pkg/version/version.go
+          git commit -m "chore: bump version to $NEW_VERSION"
+          git push
+      
+      - name: Create tag
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.new }}"
+          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+          git push origin "v$NEW_VERSION"
+
+  verify-version:
+    name: Verify Version
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Extract version from tag
+        id: tag_version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/v}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Tag version: $TAG"
+      
+      - name: Check version in code
+        run: |
+          TAG_VERSION="${{ steps.tag_version.outputs.tag }}"
+          CODE_VERSION=$(grep 'Version = ' pkg/version/version.go | sed 's/.*Version = "\(.*\)"/\1/')
+          
+          if [ "$TAG_VERSION" != "$CODE_VERSION" ]; then
+            echo "❌ Version mismatch!"
+            echo "Tag version: $TAG_VERSION"
+            echo "Code version: $CODE_VERSION"
+            exit 1
+          fi
+          
+          echo "✅ Version matches: $TAG_VERSION"
+

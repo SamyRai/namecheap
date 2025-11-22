@@ -27,27 +27,53 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+      
       - name: Build binaries
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD_DATE: ${{ github.event.head_commit.timestamp }}
+          GIT_COMMIT: ${{ github.sha }}
+          GIT_TAG: ${{ github.ref_name }}
         run: |
           mkdir -p dist
-          GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o dist/namecheap-dns-linux-amd64 ./main.go
-          GOOS=linux GOARCH=arm64 go build -ldflags="-w -s" -o dist/namecheap-dns-linux-arm64 ./main.go
-          GOOS=darwin GOARCH=amd64 go build -ldflags="-w -s" -o dist/namecheap-dns-darwin-amd64 ./main.go
-          GOOS=darwin GOARCH=arm64 go build -ldflags="-w -s" -o dist/namecheap-dns-darwin-arm64 ./main.go
-          GOOS=windows GOARCH=amd64 go build -ldflags="-w -s" -o dist/namecheap-dns-windows-amd64.exe ./main.go
+          LDFLAGS="-w -s -X namecheap-dns-manager/pkg/version.Version=${{ steps.version.outputs.version }} -X namecheap-dns-manager/pkg/version.BuildDate=${{ github.event.head_commit.timestamp }} -X namecheap-dns-manager/pkg/version.GitCommit=${{ github.sha }} -X namecheap-dns-manager/pkg/version.GitTag=${{ github.ref_name }}"
+          
+          GOOS=linux GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/namecheap-dns-linux-amd64 ./main.go
+          GOOS=linux GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/namecheap-dns-linux-arm64 ./main.go
+          GOOS=darwin GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/namecheap-dns-darwin-amd64 ./main.go
+          GOOS=darwin GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/namecheap-dns-darwin-arm64 ./main.go
+          GOOS=windows GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/namecheap-dns-windows-amd64.exe ./main.go
 
       - name: Create checksums
         run: |
           cd dist
           sha256sum * > checksums.txt
 
+      - name: Check if pre-release
+        id: prerelease
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ "$VERSION" =~ ^0\. ]] || [[ "$VERSION" =~ -(alpha|beta|rc) ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+            echo "This is a pre-release version"
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+            echo "This is a stable release"
+          fi
+      
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
           generate_release_notes: true
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.prerelease.outputs.prerelease }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
