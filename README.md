@@ -1,6 +1,6 @@
 # Namecheap DNS Manager
 
-A comprehensive command-line interface for managing Namecheap domains and DNS records with **multi-account support**.
+A command-line interface for managing Namecheap domains and DNS records with **multi-account support**.
 
 ## 🎯 Features
 
@@ -54,7 +54,7 @@ accounts:
     client_ip: "your.public.ip.address"
     use_sandbox: false
     description: "My main account"
-  
+
   work:
     username: "work-username"
     api_user: "work-api-username"
@@ -210,7 +210,7 @@ The tool automatically detects configuration files in this priority order:
 ### Getting Help
 
 ```bash
-# Comprehensive help
+# Help
 ./namecheap-dns help
 
 # Command-specific help

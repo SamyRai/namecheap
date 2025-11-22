@@ -212,7 +212,7 @@ namecheap-dns plugin myemail verify example.com
 namecheap-dns plugin myemail setup example.com --dry-run
 ```
 
-## Best Practices
+## Practices
 
 1. **Validate Input**: Always validate domain names and inputs
 2. **Support Dry Run**: Implement `--dry-run` flag support
