@@ -73,8 +73,8 @@ The tool automatically detects configuration files in this priority order:
 
 | Priority | Location | Use Case |
 |----------|----------|----------|
-| **1** | `./configs/.namecheap-dns.yaml` | 🛠️ Development |
-| **2** | `~/.namecheap-dns.yaml` | 🏠 Production |
+| **1** | `./configs/.namecheap-dns.yaml` | Development |
+| **2** | `~/.namecheap-dns.yaml` | Production |
 
 ```bash
 # Initialize configuration
