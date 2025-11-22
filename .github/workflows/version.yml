@@ -22,32 +22,32 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Get current version
         id: current_version
         run: |
           CURRENT_VERSION=$(grep 'Version = ' pkg/version/version.go | sed 's/.*Version = "\(.*\)"/\1/')
           echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $CURRENT_VERSION"
-      
+
       - name: Calculate new version
         id: new_version
         run: |
           CURRENT="${{ steps.current_version.outputs.current }}"
           TYPE="${{ github.event.inputs.version_type }}"
-          
+
           IFS='.' read -r -a PARTS <<< "$CURRENT"
           MAJOR="${PARTS[0]}"
           MINOR="${PARTS[1]}"
           PATCH="${PARTS[2]}"
-          
+
           case "$TYPE" in
             major)
               MAJOR=$((MAJOR + 1))
@@ -62,11 +62,11 @@ jobs:
               PATCH=$((PATCH + 1))
               ;;
           esac
-          
+
           NEW_VERSION="$MAJOR.$MINOR.$PATCH"
           echo "new=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "New version: $NEW_VERSION"
-      
+
       - name: Update version in code
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.new }}"
@@ -76,7 +76,7 @@ jobs:
           git add pkg/version/version.go
           git commit -m "chore: bump version to $NEW_VERSION"
           git push
-      
+
       - name: Create tag
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.new }}"
@@ -87,31 +87,31 @@ jobs:
     name: Verify Version
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Extract version from tag
         id: tag_version
         run: |
           TAG=${GITHUB_REF#refs/tags/v}
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Tag version: $TAG"
-      
+
       - name: Check version in code
         run: |
           TAG_VERSION="${{ steps.tag_version.outputs.tag }}"
           CODE_VERSION=$(grep 'Version = ' pkg/version/version.go | sed 's/.*Version = "\(.*\)"/\1/')
-          
+
           if [ "$TAG_VERSION" != "$CODE_VERSION" ]; then
             echo "❌ Version mismatch!"
             echo "Tag version: $TAG_VERSION"
             echo "Code version: $CODE_VERSION"
             exit 1
           fi
-          
+
           echo "✅ Version matches: $TAG_VERSION"
 

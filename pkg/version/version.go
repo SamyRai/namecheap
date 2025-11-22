@@ -47,15 +47,15 @@ func Get() Info {
 func String() string {
 	info := Get()
 	version := info.Version
-	
+
 	if info.GitTag != "" && info.GitTag != info.Version {
 		version = fmt.Sprintf("%s (tag: %s)", info.Version, info.GitTag)
 	}
-	
+
 	if info.GitCommit != "unknown" && len(info.GitCommit) > 7 {
 		version = fmt.Sprintf("%s (commit: %s)", version, info.GitCommit[:7])
 	}
-	
+
 	return version
 }
 
@@ -74,9 +74,9 @@ Go Version: %s
 func IsPreRelease() bool {
 	// Check if version contains pre-release identifiers
 	// Semantic versioning: 1.0.0-alpha.1, 1.0.0-beta.1, 1.0.0-rc.1
-	return len(Version) > 0 && (Version[0] == '0' || 
-		contains(Version, "-alpha") || 
-		contains(Version, "-beta") || 
+	return len(Version) > 0 && (Version[0] == '0' ||
+		contains(Version, "-alpha") ||
+		contains(Version, "-beta") ||
 		contains(Version, "-rc"))
 }
 
