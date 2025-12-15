@@ -48,12 +48,12 @@ Use GitHub Actions workflow to bump versions:
 
 Check the current version:
 ```bash
-./namecheap-dns --version
+./zonekit --version
 ```
 
 Or programmatically:
 ```go
-import "namecheap-dns-manager/pkg/version"
+import "zonekit/pkg/version"
 
 fmt.Println(version.Version)
 fmt.Println(version.String())

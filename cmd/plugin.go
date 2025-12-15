@@ -4,9 +4,10 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"namecheap-dns-manager/internal/cmdutil"
-	"namecheap-dns-manager/pkg/dns"
-	"namecheap-dns-manager/pkg/plugin"
+	"zonekit/internal/cmdutil"
+	"zonekit/pkg/dns"
+	"zonekit/pkg/dnsrecord"
+	"zonekit/pkg/plugin"
 )
 
 // pluginCmd represents the plugin command
@@ -188,23 +189,23 @@ type dnsServiceWrapper struct {
 	service *dns.Service
 }
 
-func (w *dnsServiceWrapper) GetRecords(domainName string) ([]dns.Record, error) {
+func (w *dnsServiceWrapper) GetRecords(domainName string) ([]dnsrecord.Record, error) {
 	return w.service.GetRecords(domainName)
 }
 
-func (w *dnsServiceWrapper) GetRecordsByType(domainName string, recordType string) ([]dns.Record, error) {
+func (w *dnsServiceWrapper) GetRecordsByType(domainName string, recordType string) ([]dnsrecord.Record, error) {
 	return w.service.GetRecordsByType(domainName, recordType)
 }
 
-func (w *dnsServiceWrapper) SetRecords(domainName string, records []dns.Record) error {
+func (w *dnsServiceWrapper) SetRecords(domainName string, records []dnsrecord.Record) error {
 	return w.service.SetRecords(domainName, records)
 }
 
-func (w *dnsServiceWrapper) AddRecord(domainName string, record dns.Record) error {
+func (w *dnsServiceWrapper) AddRecord(domainName string, record dnsrecord.Record) error {
 	return w.service.AddRecord(domainName, record)
 }
 
-func (w *dnsServiceWrapper) UpdateRecord(domainName string, hostname, recordType string, newRecord dns.Record) error {
+func (w *dnsServiceWrapper) UpdateRecord(domainName string, hostname, recordType string, newRecord dnsrecord.Record) error {
 	return w.service.UpdateRecord(domainName, hostname, recordType, newRecord)
 }
 
@@ -216,7 +217,7 @@ func (w *dnsServiceWrapper) DeleteAllRecords(domainName string) error {
 	return w.service.DeleteAllRecords(domainName)
 }
 
-func (w *dnsServiceWrapper) ValidateRecord(record dns.Record) error {
+func (w *dnsServiceWrapper) ValidateRecord(record dnsrecord.Record) error {
 	return w.service.ValidateRecord(record)
 }
 

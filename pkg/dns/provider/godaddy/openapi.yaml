@@ -1,0 +1,209 @@
+openapi: 3.0.0
+info:
+  title: GoDaddy API
+  version: 1.0.0
+  description: GoDaddy DNS API - OpenAPI specification for DNS record management
+servers:
+  - url: https://api.godaddy.com/v1
+    description: GoDaddy API v1
+paths:
+  /domains/{domain}/records:
+    get:
+      summary: List DNS records for a domain
+      operationId: listDNSRecords
+      tags:
+        - DNS Records
+      parameters:
+        - name: domain
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Domain name
+        - name: type
+          in: query
+          schema:
+            type: string
+          description: DNS record type filter
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: DNS record name filter
+      responses:
+        '200':
+          description: List of DNS records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DNSRecord'
+    patch:
+      summary: Replace all DNS records for a domain
+      operationId: replaceDNSRecords
+      tags:
+        - DNS Records
+      parameters:
+        - name: domain
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/DNSRecord'
+      responses:
+        '200':
+          description: Records replaced successfully
+    post:
+      summary: Add DNS records to domain
+      operationId: addDNSRecords
+      tags:
+        - DNS Records
+      parameters:
+        - name: domain
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/DNSRecord'
+      responses:
+        '200':
+          description: Records added successfully
+  /domains/{domain}/records/{type}/{name}:
+    get:
+      summary: Get specific DNS record
+      operationId: getDNSRecord
+      tags:
+        - DNS Records
+      parameters:
+        - name: domain
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: DNS record
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DNSRecord'
+    put:
+      summary: Update DNS record
+      operationId: updateDNSRecord
+      tags:
+        - DNS Records
+      parameters:
+        - name: domain
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/DNSRecord'
+      responses:
+        '200':
+          description: Record updated successfully
+    delete:
+      summary: Delete DNS record
+      operationId: deleteDNSRecord
+      tags:
+        - DNS Records
+      parameters:
+        - name: domain
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Record deleted successfully
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: GoDaddy API key (used as Bearer token)
+  schemas:
+    DNSRecord:
+      type: object
+      required:
+        - type
+        - data
+      properties:
+        name:
+          type: string
+          description: DNS record name (hostname)
+          example: "@"
+        type:
+          type: string
+          description: DNS record type (A, AAAA, CNAME, MX, TXT, etc.)
+          example: "A"
+        data:
+          type: string
+          description: DNS record data (address/value)
+          example: "192.0.2.1"
+        ttl:
+          type: integer
+          description: Time to live in seconds
+          example: 3600
+        priority:
+          type: integer
+          description: Priority for MX records
+          example: 10
+security:
+  - ApiKeyAuth: []
+

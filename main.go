@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"namecheap-dns-manager/cmd"
+	"zonekit/cmd"
 )
 
 func main() {

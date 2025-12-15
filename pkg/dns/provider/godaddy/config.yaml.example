@@ -1,0 +1,43 @@
+# GoDaddy DNS Provider Configuration
+
+name: godaddy
+display_name: GoDaddy
+type: rest
+
+auth:
+  method: bearer
+  credentials:
+    token: "${GODADDY_API_KEY}"
+    # GoDaddy uses API key + API secret, but API key is used as Bearer token
+    # Get your API key from: https://developer.godaddy.com/
+
+api:
+  base_url: "https://api.godaddy.com/v1"
+  endpoints:
+    get_records: "/domains/{domain}/records"
+    create_record: "/domains/{domain}/records"
+    update_record: "/domains/{domain}/records/{record_type}/{hostname}"
+    delete_record: "/domains/{domain}/records/{record_type}/{hostname}"
+  headers:
+    Content-Type: "application/json"
+  timeout: 30
+  retries: 3
+
+mappings:
+  request:
+    hostname: "name"
+    record_type: "type"
+    address: "data"      # GoDaddy uses "data" instead of "address"
+    ttl: "ttl"
+    mx_pref: "priority"
+  response:
+    hostname: "name"
+    record_type: "type"
+    address: "data"
+    ttl: "ttl"
+    mx_pref: "priority"
+  list_path: ""          # GoDaddy returns array directly
+
+settings:
+  zone_id_required: false
+

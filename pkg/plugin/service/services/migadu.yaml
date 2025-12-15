@@ -1,0 +1,59 @@
+name: migadu
+display_name: Migadu
+description: Migadu email hosting setup and management
+category: email
+
+records:
+  mx:
+    - hostname: "@"
+      server: aspmx1.migadu.com
+      priority: 10
+    - hostname: "@"
+      server: aspmx2.migadu.com
+      priority: 20
+
+  spf:
+    hostname: "@"
+    value: "v=spf1 include:spf.migadu.com -all"
+
+  dkim:
+    - hostname: key1._domainkey
+      type: CNAME
+      value: key1.{domain}._domainkey.migadu.com
+    - hostname: key2._domainkey
+      type: CNAME
+      value: key2.{domain}._domainkey.migadu.com
+    - hostname: key3._domainkey
+      type: CNAME
+      value: key3.{domain}._domainkey.migadu.com
+
+  dmarc:
+    hostname: "@"
+    value: "v=DMARC1; p=quarantine;"
+
+  autodiscover:
+    type: CNAME
+    hostname: autoconfig
+    cname: autoconfig.migadu.com
+
+verification:
+  required_records:
+    - type: MX
+      hostname: "@"
+      contains: aspmx1.migadu.com
+    - type: MX
+      hostname: "@"
+      contains: aspmx2.migadu.com
+    - type: TXT
+      hostname: "@"
+      contains: include:spf.migadu.com
+    - type: TXT
+      hostname: "@"
+      starts_with: "v=DMARC1"
+    - type: CNAME
+      hostname: key1._domainkey
+      contains: migadu.com
+    - type: CNAME
+      hostname: autoconfig
+      contains: autoconfig.migadu.com
+

@@ -1,0 +1,17 @@
+# Example Namecheap DNS Provider Configuration
+# This is for reference - Namecheap provider uses Go adapter, not config-based
+# Note: This is provider-specific configuration for the Namecheap provider adapter
+
+name: namecheap
+display_name: Namecheap
+type: namecheap
+
+# Namecheap uses SOAP API, so it requires a Go adapter
+# Authentication is handled via account config (username, api_key, client_ip)
+# This config file is optional and mainly for documentation
+
+settings:
+  # Namecheap-specific settings
+  use_sandbox: false  # Use sandbox environment
+  email_type_required: true  # MX records require EmailType parameter
+

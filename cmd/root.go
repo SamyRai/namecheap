@@ -3,13 +3,15 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"namecheap-dns-manager/pkg/config"
-	"namecheap-dns-manager/pkg/plugin"
-	"namecheap-dns-manager/pkg/plugin/migadu"
-	"namecheap-dns-manager/pkg/version"
+	"zonekit/pkg/config"
+	"zonekit/pkg/dns/provider/autodiscover"
+	"zonekit/pkg/plugin"
+	"zonekit/pkg/plugin/service"
+	"zonekit/pkg/version"
 )
 
 var cfgFile string
@@ -17,17 +19,17 @@ var accountName string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "namecheap-dns",
-	Short: "A CLI tool for managing Namecheap domains and DNS records",
-	Long: `A command-line interface for managing Namecheap domains and DNS records.
+	Use:   "zonekit",
+	Short: "A CLI tool for managing DNS zones and records across multiple providers",
+	Long: `A command-line interface for managing DNS zones and records across multiple providers.
 This tool allows you to:
 - List and manage your domains
 - Create, update, and delete DNS records
 - Bulk operations on DNS records
 - Domain registration and management
-- Manage multiple Namecheap accounts
+- Manage multiple DNS provider accounts
+- Support for multiple DNS providers (Namecheap, Cloudflare, and more)
 
-⚠️  WARNING: This is NOT an official Namecheap tool. Use at your own risk.
 Current version: ` + version.Version + ` (pre-1.0.0)`,
 	Version: version.String(),
 }
@@ -39,10 +41,10 @@ func Execute() error {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig, initPlugins)
+	cobra.OnInitialize(initConfig, initProviders, initPlugins)
 
 	// Here you will define your flags and configuration settings.
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.namecheap-dns.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.zonekit.yaml)")
 	rootCmd.PersistentFlags().StringVar(&accountName, "account", "", "use specific account (default: current account)")
 
 	// Legacy flags for backward compatibility (deprecated)
@@ -75,10 +77,10 @@ func initConfig() {
 			home, err := os.UserHomeDir()
 			cobra.CheckErr(err)
 
-			// Search config in home directory with name ".namecheap-dns" (without extension).
+			// Search config in home directory with name ".zonekit" (without extension).
 			viper.AddConfigPath(home)
 			viper.SetConfigType("yaml")
-			viper.SetConfigName(".namecheap-dns")
+			viper.SetConfigName(".zonekit")
 		}
 	}
 
@@ -115,12 +117,88 @@ func GetCurrentAccount() (*config.AccountConfig, error) {
 	return configManager.GetCurrentAccount()
 }
 
+// initProviders registers all available DNS providers
+func initProviders() {
+	// Auto-discover and register all REST-based providers from subdirectories
+	// OpenAPI-only approach: providers must have openapi.yaml file
+	if err := autodiscover.DiscoverAndRegister(""); err != nil {
+		// Log but don't fail - some providers might not have OpenAPI specs
+		// This is expected in development or if providers aren't configured
+	}
+}
+
 // initPlugins registers all built-in plugins
 func initPlugins() {
-	// Register Migadu plugin
-	if err := plugin.Register(migadu.New()); err != nil {
-		// Log error but don't fail - plugins are optional
-		fmt.Fprintf(os.Stderr, "Warning: failed to register Migadu plugin: %v\n", err)
+	// Register generic service plugin with config-based service integrations
+	serviceConfigs, err := loadServiceConfigs()
+	if err != nil {
+		// Log error but don't fail - service plugin is optional
+		fmt.Fprintf(os.Stderr, "Warning: failed to load service configs: %v\n", err)
+	} else if len(serviceConfigs) > 0 {
+		servicePlugin := service.NewServicePlugin(serviceConfigs)
+		if err := plugin.Register(servicePlugin); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to register service plugin: %v\n", err)
+		}
 	}
-	// Add more plugin registrations here as needed
+}
+
+// loadServiceConfigs loads all service integration configurations
+func loadServiceConfigs() (map[string]*service.Config, error) {
+	// Try to find services directory relative to executable or project root
+	servicesDir := findServicesDirectory()
+	if servicesDir == "" {
+		return nil, fmt.Errorf("services directory not found")
+	}
+
+	configs, err := service.LoadAllConfigs(servicesDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load service configs: %w", err)
+	}
+
+	return configs, nil
+}
+
+// findServicesDirectory finds the services configuration directory
+func findServicesDirectory() string {
+	// Try multiple locations in order of preference:
+
+	// 1. Project directory (for development)
+	if projectConfigPath := config.FindProjectConfigPath(); projectConfigPath != "" {
+		projectRoot := filepath.Dir(filepath.Dir(projectConfigPath))
+		servicesPath := filepath.Join(projectRoot, "pkg", "plugin", "service", "services")
+		if _, err := os.Stat(servicesPath); err == nil {
+			return servicesPath
+		}
+	}
+
+	// 2. Relative to executable (for installed binaries)
+	if exe, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exe)
+		servicesPath := filepath.Join(exeDir, "services")
+		if _, err := os.Stat(servicesPath); err == nil {
+			return servicesPath
+		}
+		// Also try embedded location
+		servicesPath = filepath.Join(exeDir, "pkg", "plugin", "service", "services")
+		if _, err := os.Stat(servicesPath); err == nil {
+			return servicesPath
+		}
+	}
+
+	// 3. Current working directory
+	cwd, _ := os.Getwd()
+	servicesPath := filepath.Join(cwd, "pkg", "plugin", "service", "services")
+	if _, err := os.Stat(servicesPath); err == nil {
+		return servicesPath
+	}
+
+	// 4. Home directory
+	if home, err := os.UserHomeDir(); err == nil {
+		servicesPath := filepath.Join(home, ".zonekit", "services")
+		if _, err := os.Stat(servicesPath); err == nil {
+			return servicesPath
+		}
+	}
+
+	return ""
 }

@@ -7,9 +7,12 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"zonekit/internal/cmdutil"
+	"zonekit/pkg/dns"
+	"zonekit/pkg/dnsrecord"
+
 	"github.com/spf13/cobra"
-	"namecheap-dns-manager/internal/cmdutil"
-	"namecheap-dns-manager/pkg/dns"
+	"gopkg.in/yaml.v3"
 )
 
 // dnsCmd represents the dns command
@@ -50,7 +53,7 @@ var dnsListCmd = &cobra.Command{
 
 		dnsService := dns.NewService(client)
 
-		var records []dns.Record
+		var records []dnsrecord.Record
 		if recordType != "" {
 			records, err = dnsService.GetRecordsByType(domainName, strings.ToUpper(recordType))
 		} else {
@@ -130,7 +133,7 @@ var dnsAddCmd = &cobra.Command{
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
 
-		record := dns.Record{
+		record := dnsrecord.Record{
 			HostName:   hostname,
 			RecordType: recordType,
 			Address:    value,
@@ -191,7 +194,7 @@ var dnsUpdateCmd = &cobra.Command{
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
 
-		newRecord := dns.Record{
+		newRecord := dnsrecord.Record{
 			HostName:   hostname,
 			RecordType: recordType,
 			Address:    newValue,
@@ -326,17 +329,57 @@ operations:
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
+		if err != nil {
+			return err
+		}
+		cmdutil.DisplayAccountInfo(accountConfig)
+
+		dnsService := dns.NewService(client)
+
+		// Parse the operations file
+		operations, err := parseBulkOperationsFile(operationsFile)
+		if err != nil {
+			return fmt.Errorf("failed to parse operations file: %w", err)
+		}
+
+		if len(operations) == 0 {
+			return fmt.Errorf("no operations found in file %s", operationsFile)
+		}
+
+		// Show what will be done
+		fmt.Printf("Applying %d bulk operations to %s\n", len(operations), domainName)
+		fmt.Println("=====================================")
+
+		for i, op := range operations {
+			action := strings.Title(op.Action)
+			fmt.Printf("%d. %s %s %s → %s", i+1, action, op.Record.HostName, op.Record.RecordType, op.Record.Address)
+			if op.Record.TTL > 0 {
+				fmt.Printf(" (TTL: %d)", op.Record.TTL)
+			}
+			if op.Record.MXPref > 0 {
+				fmt.Printf(" (Priority: %d)", op.Record.MXPref)
+			}
+			fmt.Println()
+		}
 		fmt.Println()
 
-		// TODO: Implement bulk operations from file
-		// This would involve:
-		// 1. Reading and parsing the YAML file
-		// 2. Converting to BulkOperation structs
-		// 3. Calling dnsService.BulkUpdate()
+		// Confirm before proceeding
+		confirm, _ := cmd.Flags().GetBool("confirm")
+		if !confirm {
+			fmt.Println("Use --confirm to apply these changes.")
+			return nil
+		}
 
-		return fmt.Errorf("bulk operations not yet implemented - TODO: parse %s and apply to %s", operationsFile, domainName)
+		// Apply the operations
+		err = dnsService.BulkUpdate(domainName, operations)
+		if err != nil {
+			return fmt.Errorf("failed to apply bulk operations: %w", err)
+		}
+
+		fmt.Printf("✅ Successfully applied %d bulk operations to %s\n", len(operations), domainName)
+		return nil
 	},
 }
 
@@ -402,17 +445,22 @@ var dnsExportCmd = &cobra.Command{
 			return fmt.Errorf("failed to get DNS records: %w", err)
 		}
 
-		// TODO: Implement zone file export
-		// This would involve:
-		// 1. Converting records to zone file format
-		// 2. Writing to file or stdout
+		// Convert records to zone file format
+		zoneContent := formatAsZoneFile(domainName, records)
 
-		fmt.Printf("Export %d records from %s", len(records), domainName)
 		if outputFile != "" {
-			fmt.Printf(" to %s", outputFile)
+			// Write to file
+			err = os.WriteFile(outputFile, []byte(zoneContent), 0644)
+			if err != nil {
+				return fmt.Errorf("failed to write zone file: %w", err)
+			}
+			fmt.Printf("✅ Exported %d records from %s to %s\n", len(records), domainName, outputFile)
+		} else {
+			// Write to stdout
+			fmt.Printf("Zone file for %s:\n", domainName)
+			fmt.Println("=====================================")
+			fmt.Print(zoneContent)
 		}
-		fmt.Println()
-		fmt.Println("TODO: Implement zone file export")
 
 		return nil
 	},
@@ -442,4 +490,138 @@ func init() {
 
 	// Flags for dns clear
 	dnsClearCmd.Flags().BoolP("confirm", "y", false, "Confirm deletion of all records")
+
+	// Flags for dns bulk
+	dnsBulkCmd.Flags().BoolP("confirm", "y", false, "Confirm the bulk operations")
+}
+
+// formatAsZoneFile converts DNS records to BIND zone file format
+func formatAsZoneFile(domainName string, records []dnsrecord.Record) string {
+	var sb strings.Builder
+
+	// Write SOA record (placeholder - would need proper SOA data)
+	sb.WriteString(fmt.Sprintf("$ORIGIN %s.\n", domainName))
+	sb.WriteString(fmt.Sprintf("@ IN SOA ns1.namecheap.com. admin.%s. (\n", domainName))
+	sb.WriteString("\t1 ; serial\n")
+	sb.WriteString("\t3600 ; refresh\n")
+	sb.WriteString("\t1800 ; retry\n")
+	sb.WriteString("\t604800 ; expire\n")
+	sb.WriteString("\t3600 ; minimum TTL\n")
+	sb.WriteString(")\n\n")
+
+	// Write NS records (placeholder)
+	sb.WriteString("; Name servers\n")
+	sb.WriteString("@ IN NS ns1.namecheap.com.\n")
+	sb.WriteString("@ IN NS ns2.namecheap.com.\n\n")
+
+	// Write other records
+	for _, record := range records {
+		hostname := record.HostName
+		if hostname == "@" {
+			hostname = ""
+		}
+
+		ttl := ""
+		if record.TTL > 0 {
+			ttl = fmt.Sprintf("\t%d", record.TTL)
+		} else {
+			ttl = "\t3600" // default TTL
+		}
+
+		switch record.RecordType {
+		case dnsrecord.RecordTypeA:
+			sb.WriteString(fmt.Sprintf("%s%s IN A %s\n", hostname, ttl, record.Address))
+		case dnsrecord.RecordTypeAAAA:
+			sb.WriteString(fmt.Sprintf("%s%s IN AAAA %s\n", hostname, ttl, record.Address))
+		case dnsrecord.RecordTypeCNAME:
+			sb.WriteString(fmt.Sprintf("%s%s IN CNAME %s\n", hostname, ttl, record.Address))
+		case dnsrecord.RecordTypeMX:
+			mxPref := record.MXPref
+			if mxPref == 0 {
+				mxPref = 10 // default priority
+			}
+			sb.WriteString(fmt.Sprintf("%s%s IN MX %d %s\n", hostname, ttl, mxPref, record.Address))
+		case dnsrecord.RecordTypeTXT:
+			// Handle long TXT records by splitting if necessary
+			txtValue := record.Address
+			if !strings.HasPrefix(txtValue, "\"") {
+				txtValue = fmt.Sprintf("\"%s\"", txtValue)
+			}
+			sb.WriteString(fmt.Sprintf("%s%s IN TXT %s\n", hostname, ttl, txtValue))
+		case dnsrecord.RecordTypeNS:
+			sb.WriteString(fmt.Sprintf("%s%s IN NS %s\n", hostname, ttl, record.Address))
+		case dnsrecord.RecordTypeSRV:
+			// SRV records need special parsing, for now just output as-is
+			sb.WriteString(fmt.Sprintf("%s%s IN SRV %s\n", hostname, ttl, record.Address))
+		default:
+			// For unknown types, output as generic record
+			sb.WriteString(fmt.Sprintf("%s%s IN %s %s\n", hostname, ttl, record.RecordType, record.Address))
+		}
+	}
+
+	return sb.String()
+}
+
+// parseBulkOperationsFile parses a YAML file containing bulk DNS operations
+func parseBulkOperationsFile(filePath string) ([]dns.BulkOperation, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read operations file: %w", err)
+	}
+
+	// Define the structure for parsing
+	type OperationInput struct {
+		Action   string `yaml:"action"`
+		Hostname string `yaml:"hostname"`
+		Type     string `yaml:"type"`
+		Value    string `yaml:"value"`
+		TTL      int    `yaml:"ttl,omitempty"`
+		MXPref   int    `yaml:"mx_pref,omitempty"`
+	}
+
+	var inputs []OperationInput
+	if err := yaml.Unmarshal(data, &inputs); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+	}
+
+	var operations []dns.BulkOperation
+	for _, input := range inputs {
+		// Validate required fields
+		if input.Action == "" {
+			return nil, fmt.Errorf("operation missing required field: action")
+		}
+		if input.Hostname == "" {
+			return nil, fmt.Errorf("operation missing required field: hostname")
+		}
+		if input.Type == "" {
+			return nil, fmt.Errorf("operation missing required field: type")
+		}
+		if input.Value == "" {
+			return nil, fmt.Errorf("operation missing required field: value")
+		}
+
+		// Validate action
+		action := strings.ToLower(input.Action)
+		if action != dns.BulkActionAdd && action != dns.BulkActionUpdate && action != dns.BulkActionDelete {
+			return nil, fmt.Errorf("invalid action '%s', must be one of: %s, %s, %s", input.Action, dns.BulkActionAdd, dns.BulkActionUpdate, dns.BulkActionDelete)
+		}
+
+		// Create the record
+		record := dnsrecord.Record{
+			HostName:   input.Hostname,
+			RecordType: input.Type,
+			Address:    input.Value,
+			TTL:        input.TTL,
+			MXPref:     input.MXPref,
+		}
+
+		operation := dns.BulkOperation{
+			Action: action,
+			Record: record,
+		}
+
+		operations = append(operations, operation)
+	}
+
+	return operations, nil
 }

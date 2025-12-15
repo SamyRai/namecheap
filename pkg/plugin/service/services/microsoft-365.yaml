@@ -1,0 +1,52 @@
+name: microsoft-365
+display_name: Microsoft 365
+description: Microsoft 365 (Exchange Online) email hosting setup
+category: email
+
+records:
+  mx:
+    - hostname: "@"
+      server: "{domain}.mail.protection.outlook.com"
+      priority: 0
+
+  spf:
+    hostname: "@"
+    value: "v=spf1 include:spf.protection.outlook.com -all"
+
+  dkim:
+    - hostname: selector1._domainkey
+      type: CNAME
+      value: "selector1-{domain}._domainkey.{domain}.onmicrosoft.com"
+    - hostname: selector2._domainkey
+      type: CNAME
+      value: "selector2-{domain}._domainkey.{domain}.onmicrosoft.com"
+
+  dmarc:
+    hostname: "_dmarc"
+    value: "v=DMARC1; p=none; pct=100; rua=mailto:dmarcreports@{domain}"
+
+  autodiscover:
+    type: CNAME
+    hostname: autodiscover
+    cname: autodiscover.outlook.com
+
+  custom:
+    - hostname: "@"
+      type: TXT
+      value: "MS=ms12345678"
+    - hostname: "@"
+      type: CNAME
+      value: "{domain}.mail.protection.outlook.com"
+
+verification:
+  required_records:
+    - type: MX
+      hostname: "@"
+      contains: mail.protection.outlook.com
+    - type: TXT
+      hostname: "@"
+      contains: include:spf.protection.outlook.com
+    - type: CNAME
+      hostname: autodiscover
+      contains: autodiscover.outlook.com
+

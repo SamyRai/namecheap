@@ -1,8 +1,8 @@
-# Namecheap DNS Manager - Quick Start
+# ZoneKit - Quick Start
 
 ## What's Been Built
 
-A CLI tool for managing Namecheap domains and DNS records with Migadu email hosting integration.
+A CLI tool for managing DNS zones and records across multiple providers with Migadu email hosting integration.
 
 ## Key Features Implemented
 
@@ -23,8 +23,8 @@ A CLI tool for managing Namecheap domains and DNS records with Migadu email host
 
 ✅ **Migadu Email Integration** (Special Feature!)
 
-- One-command setup: `./namecheap-dns migadu setup domain.com`
-- Verification: `./namecheap-dns migadu verify domain.com`
+- One-command setup: `./zonekit migadu setup domain.com`
+- Verification: `./zonekit migadu verify domain.com`
 - Dry-run support to preview changes
 - Conflict detection for existing records
 - Easy cleanup/removal
@@ -40,22 +40,22 @@ A CLI tool for managing Namecheap domains and DNS records with Migadu email host
 
 ```bash
 # Build the app
-go build -o namecheap-dns main.go
+go build -o zonekit main.go
 
 # Configure (already done with your credentials)
-./namecheap-dns config show
+./zonekit config show
 
 # List your domains
-./namecheap-dns domain list
+./zonekit domain list
 
 # Check DNS records
-./namecheap-dns dns list mukimov.com
+./zonekit dns list mukimov.com
 
 # Verify your existing Migadu setup
-./namecheap-dns migadu verify mukimov.com
+./zonekit migadu verify mukimov.com
 
 # Set up Migadu on a new domain (dry run first)
-./namecheap-dns migadu setup glpx.pro --dry-run
+./zonekit migadu setup glpx.pro --dry-run
 ```
 
 ## Your Current Setup

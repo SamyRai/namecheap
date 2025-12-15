@@ -1,0 +1,31 @@
+name: sendgrid
+display_name: SendGrid
+description: SendGrid transactional email service setup
+category: email
+
+records:
+  spf:
+    hostname: "@"
+    value: "v=spf1 include:sendgrid.net ~all"
+
+  dkim:
+    - hostname: s1._domainkey
+      type: CNAME
+      value: s1.domainkey.u1234567.wl123.sendgrid.net
+    - hostname: s2._domainkey
+      type: CNAME
+      value: s2.domainkey.u1234567.wl123.sendgrid.net
+
+  dmarc:
+    hostname: "_dmarc"
+    value: "v=DMARC1; p=none; rua=mailto:dmarc@{domain}"
+
+verification:
+  required_records:
+    - type: TXT
+      hostname: "@"
+      contains: include:sendgrid.net
+    - type: CNAME
+      hostname: s1._domainkey
+      contains: sendgrid.net
+

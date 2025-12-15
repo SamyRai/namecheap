@@ -1,0 +1,228 @@
+openapi: 3.0.0
+info:
+  title: Cloudflare DNS API
+  version: 1.0.0
+  description: Minimal OpenAPI spec for Cloudflare DNS operations only
+servers:
+  - url: https://api.cloudflare.com/client/v4
+    description: Cloudflare API v4
+paths:
+  /zones/{zone_id}/dns_records:
+    get:
+      summary: List DNS records
+      operationId: listDNSRecords
+      tags:
+        - DNS Records
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Zone identifier
+      responses:
+        '200':
+          description: List of DNS records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DNSRecordsResponse'
+    post:
+      summary: Create DNS record
+      operationId: createDNSRecord
+      tags:
+        - DNS Records
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DNSRecordRequest'
+      responses:
+        '200':
+          description: DNS record created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DNSRecordResponse'
+  /zones/{zone_id}/dns_records/{dns_record_id}:
+    get:
+      summary: Get DNS record
+      operationId: getDNSRecord
+      tags:
+        - DNS Records
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: dns_record_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: DNS record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DNSRecordResponse'
+    put:
+      summary: Update DNS record
+      operationId: updateDNSRecord
+      tags:
+        - DNS Records
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: dns_record_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DNSRecordRequest'
+      responses:
+        '200':
+          description: DNS record updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DNSRecordResponse'
+    delete:
+      summary: Delete DNS record
+      operationId: deleteDNSRecord
+      tags:
+        - DNS Records
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: dns_record_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: DNS record deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DNSRecordResponse'
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Auth-Key
+      description: Cloudflare API key
+    EmailAuth:
+      type: apiKey
+      in: header
+      name: X-Auth-Email
+      description: Cloudflare account email
+  schemas:
+    DNSRecordRequest:
+      type: object
+      required:
+        - type
+        - content
+      properties:
+        type:
+          type: string
+          description: DNS record type (A, AAAA, CNAME, MX, TXT, etc.)
+          example: "A"
+        name:
+          type: string
+          description: DNS record name (hostname)
+          example: "@"
+        content:
+          type: string
+          description: DNS record content (address/value)
+          example: "192.0.2.1"
+        ttl:
+          type: integer
+          description: Time to live in seconds
+          example: 3600
+        priority:
+          type: integer
+          description: Priority for MX records
+          example: 10
+        proxied:
+          type: boolean
+          description: Whether the record is proxied through Cloudflare
+          example: false
+    DNSRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: DNS record identifier
+        type:
+          type: string
+          description: DNS record type
+        name:
+          type: string
+          description: DNS record name (hostname)
+        content:
+          type: string
+          description: DNS record content (address/value)
+        ttl:
+          type: integer
+          description: Time to live in seconds
+        priority:
+          type: integer
+          description: Priority for MX records
+        proxied:
+          type: boolean
+          description: Whether the record is proxied
+        created_on:
+          type: string
+          format: date-time
+        modified_on:
+          type: string
+          format: date-time
+    DNSRecordsResponse:
+      type: object
+      properties:
+        result:
+          type: array
+          items:
+            $ref: '#/components/schemas/DNSRecord'
+        result_info:
+          type: object
+          properties:
+            page:
+              type: integer
+            per_page:
+              type: integer
+            count:
+              type: integer
+            total_count:
+              type: integer
+    DNSRecordResponse:
+      type: object
+      properties:
+        result:
+          $ref: '#/components/schemas/DNSRecord'
+security:
+  - ApiKeyAuth: []
+  - EmailAuth: []

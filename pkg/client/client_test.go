@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"namecheap-dns-manager/internal/testutil"
-	"namecheap-dns-manager/pkg/config"
+	"zonekit/internal/testutil"
+	"zonekit/pkg/config"
 )
 
 // ClientTestSuite is a test suite for client package

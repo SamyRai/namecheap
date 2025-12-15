@@ -1,0 +1,36 @@
+name: mailgun
+display_name: Mailgun
+description: Mailgun email API service setup
+category: email
+
+records:
+  mx:
+    - hostname: "@"
+      server: mxa.mailgun.org
+      priority: 10
+    - hostname: "@"
+      server: mxb.mailgun.org
+      priority: 10
+
+  spf:
+    hostname: "@"
+    value: "v=spf1 include:mailgun.org ~all"
+
+  dkim:
+    - hostname: k1._domainkey
+      type: TXT
+      value: "k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC..."
+
+  dmarc:
+    hostname: "_dmarc"
+    value: "v=DMARC1; p=none; rua=mailto:dmarc@{domain}"
+
+verification:
+  required_records:
+    - type: MX
+      hostname: "@"
+      contains: mailgun.org
+    - type: TXT
+      hostname: "@"
+      contains: include:mailgun.org
+
