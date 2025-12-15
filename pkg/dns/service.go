@@ -4,125 +4,68 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/namecheap/go-namecheap-sdk/v2/namecheap"
-	"namecheap-dns-manager/pkg/client"
-	"namecheap-dns-manager/pkg/errors"
-	"namecheap-dns-manager/pkg/pointer"
+	"zonekit/pkg/client"
+	"zonekit/pkg/dns/provider"
+	"zonekit/pkg/dns/provider/namecheap"
+	"zonekit/pkg/dnsrecord"
+	"zonekit/pkg/errors"
 )
 
 // Service provides DNS record management operations
 type Service struct {
-	client *client.Client
+	provider provider.Provider
 }
 
-// NewService creates a new DNS service
+// NewService creates a new DNS service with Namecheap provider
 func NewService(client *client.Client) *Service {
+	// Register Namecheap provider
+	_ = namecheap.Register(client)
+
+	// Get the provider from registry
+	dnsProvider, _ := provider.Get("namecheap")
+
 	return &Service{
-		client: client,
+		provider: dnsProvider,
 	}
 }
 
-// Record represents a DNS record
-type Record struct {
-	HostName   string
-	RecordType string
-	Address    string
-	TTL        int
-	MXPref     int
+// NewServiceWithProvider creates a new DNS service with a specific provider
+func NewServiceWithProvider(dnsProvider provider.Provider) *Service {
+	return &Service{
+		provider: dnsProvider,
+	}
 }
 
-// RecordType constants
-const (
-	RecordTypeA     = "A"
-	RecordTypeAAAA  = "AAAA"
-	RecordTypeCNAME = "CNAME"
-	RecordTypeMX    = "MX"
-	RecordTypeTXT   = "TXT"
-	RecordTypeNS    = "NS"
-	RecordTypeSRV   = "SRV"
-)
+// NewServiceWithProviderName creates a new DNS service using a provider by name
+func NewServiceWithProviderName(providerName string) (*Service, error) {
+	dnsProvider, err := provider.Get(providerName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get DNS provider %s: %w", providerName, err)
+	}
+
+	return &Service{
+		provider: dnsProvider,
+	}, nil
+}
+
 
 // GetRecords retrieves all DNS records for a domain
-func (s *Service) GetRecords(domainName string) ([]Record, error) {
-	nc := s.client.GetNamecheapClient()
-
-	resp, err := nc.DomainsDNS.GetHosts(domainName)
-	if err != nil {
-		return nil, errors.NewAPI("GetHosts", fmt.Sprintf("failed to get DNS records for %s", domainName), err)
-	}
-
-	// Safety check for nil response
-	if resp == nil || resp.DomainDNSGetHostsResult == nil || resp.DomainDNSGetHostsResult.Hosts == nil {
-		return []Record{}, nil
-	}
-
-	records := make([]Record, 0, len(*resp.DomainDNSGetHostsResult.Hosts))
-	for _, host := range *resp.DomainDNSGetHostsResult.Hosts {
-		record := Record{
-			HostName:   pointer.String(host.Name),
-			RecordType: pointer.String(host.Type),
-			Address:    pointer.String(host.Address),
-			TTL:        pointer.Int(host.TTL),
-			MXPref:     pointer.Int(host.MXPref),
-		}
-		records = append(records, record)
-	}
-
-	return records, nil
+func (s *Service) GetRecords(domainName string) ([]dnsrecord.Record, error) {
+	return s.provider.GetRecords(domainName)
 }
 
 // SetRecords sets DNS records for a domain (replaces all existing records)
-func (s *Service) SetRecords(domainName string, records []Record) error {
-	nc := s.client.GetNamecheapClient()
-
-	// Convert records to Namecheap format
-	hostRecords := make([]namecheap.DomainsDNSHostRecord, len(records))
-	hasMXRecords := false
-	for i, record := range records {
-		hostRecord := namecheap.DomainsDNSHostRecord{
-			HostName:   namecheap.String(record.HostName),
-			RecordType: namecheap.String(record.RecordType),
-			Address:    namecheap.String(record.Address),
-		}
-
-		if record.TTL > 0 {
-			hostRecord.TTL = namecheap.Int(record.TTL)
-		}
-
-		if record.MXPref > 0 {
-			hostRecord.MXPref = namecheap.UInt8(uint8(record.MXPref))
-		}
-
-		// Check if this is an MX record
-		if record.RecordType == RecordTypeMX {
-			hasMXRecords = true
-		}
-
-		hostRecords[i] = hostRecord
-	}
-
-	// Build SetHostsArgs
-	args := &namecheap.DomainsDNSSetHostsArgs{
-		Domain:  namecheap.String(domainName),
-		Records: &hostRecords,
-	}
-
-	// Set EmailType to MX if there are any MX records
-	// This is required by the Namecheap API when MX records are present
-	if hasMXRecords {
-		args.EmailType = namecheap.String(EmailTypeMX)
-	}
-
-	_, err := nc.DomainsDNS.SetHosts(args)
-	if err != nil {
-		return errors.NewAPI("SetHosts", fmt.Sprintf("failed to set DNS records for %s", domainName), err)
-	}
-
-	return nil
+func (s *Service) SetRecords(domainName string, records []dnsrecord.Record) error {
+	return s.provider.SetRecords(domainName, records)
 }
 
 // AddRecord adds a single DNS record to a domain
-func (s *Service) AddRecord(domainName string, record Record) error {
+func (s *Service) AddRecord(domainName string, record dnsrecord.Record) error {
+	// Validate record before adding
+	if err := s.ValidateRecord(record); err != nil {
+		return fmt.Errorf("invalid record: %w", err)
+	}
+
 	// Get existing records
 	existingRecords, err := s.GetRecords(domainName)
 	if err != nil {
@@ -137,7 +80,7 @@ func (s *Service) AddRecord(domainName string, record Record) error {
 }
 
 // UpdateRecord updates a DNS record by hostname and type
-func (s *Service) UpdateRecord(domainName string, hostname, recordType string, newRecord Record) error {
+func (s *Service) UpdateRecord(domainName string, hostname, recordType string, newRecord dnsrecord.Record) error {
 	// Get existing records
 	existingRecords, err := s.GetRecords(domainName)
 	if err != nil {
@@ -171,7 +114,7 @@ func (s *Service) DeleteRecord(domainName string, hostname, recordType string) e
 	}
 
 	// Filter out the record to delete
-	var filteredRecords []Record
+	var filteredRecords []dnsrecord.Record
 	found := false
 	for _, record := range existingRecords {
 		if record.HostName == hostname && record.RecordType == recordType {
@@ -191,17 +134,17 @@ func (s *Service) DeleteRecord(domainName string, hostname, recordType string) e
 
 // DeleteAllRecords removes all DNS records for a domain
 func (s *Service) DeleteAllRecords(domainName string) error {
-	return s.SetRecords(domainName, []Record{})
+	return s.SetRecords(domainName, []dnsrecord.Record{})
 }
 
 // GetRecordsByType filters records by type
-func (s *Service) GetRecordsByType(domainName string, recordType string) ([]Record, error) {
+func (s *Service) GetRecordsByType(domainName string, recordType string) ([]dnsrecord.Record, error) {
 	allRecords, err := s.GetRecords(domainName)
 	if err != nil {
 		return nil, err
 	}
 
-	var filteredRecords []Record
+	var filteredRecords []dnsrecord.Record
 	for _, record := range allRecords {
 		if record.RecordType == recordType {
 			filteredRecords = append(filteredRecords, record)
@@ -212,7 +155,7 @@ func (s *Service) GetRecordsByType(domainName string, recordType string) ([]Reco
 }
 
 // ValidateRecord validates a DNS record before adding/updating
-func (s *Service) ValidateRecord(record Record) error {
+func (s *Service) ValidateRecord(record dnsrecord.Record) error {
 	if record.HostName == "" {
 		return errors.NewInvalidInput("hostname", "cannot be empty")
 	}
@@ -226,7 +169,7 @@ func (s *Service) ValidateRecord(record Record) error {
 	}
 
 	// Validate record type
-	validTypes := []string{RecordTypeA, RecordTypeAAAA, RecordTypeCNAME, RecordTypeMX, RecordTypeTXT, RecordTypeNS, RecordTypeSRV}
+	validTypes := []string{dnsrecord.RecordTypeA, dnsrecord.RecordTypeAAAA, dnsrecord.RecordTypeCNAME, dnsrecord.RecordTypeMX, dnsrecord.RecordTypeTXT, dnsrecord.RecordTypeNS, dnsrecord.RecordTypeSRV}
 	isValid := false
 	for _, validType := range validTypes {
 		if record.RecordType == validType {
@@ -261,15 +204,15 @@ func (s *Service) ValidateRecord(record Record) error {
 
 	// Type-specific validation
 	switch record.RecordType {
-	case RecordTypeA:
+	case dnsrecord.RecordTypeA:
 		if err := ValidateIPv4(record.Address); err != nil {
 			return errors.NewInvalidInput("address", fmt.Sprintf("A record must have valid IPv4 address: %v", err))
 		}
-	case RecordTypeAAAA:
+	case dnsrecord.RecordTypeAAAA:
 		if err := ValidateIPv6(record.Address); err != nil {
 			return errors.NewInvalidInput("address", fmt.Sprintf("AAAA record must have valid IPv6 address: %v", err))
 		}
-	case RecordTypeMX:
+	case dnsrecord.RecordTypeMX:
 		if record.MXPref <= 0 {
 			return errors.NewInvalidInput("mx_pref", "MX records must have a priority value")
 		}
@@ -277,12 +220,12 @@ func (s *Service) ValidateRecord(record Record) error {
 		if err := ValidateHostname(record.Address); err != nil {
 			return errors.NewInvalidInput("address", fmt.Sprintf("MX record must have valid hostname: %v", err))
 		}
-	case RecordTypeCNAME:
+	case dnsrecord.RecordTypeCNAME:
 		// CNAME address should be a valid hostname
 		if err := ValidateHostname(record.Address); err != nil {
 			return errors.NewInvalidInput("address", fmt.Sprintf("CNAME record must have valid hostname: %v", err))
 		}
-	case RecordTypeNS:
+	case dnsrecord.RecordTypeNS:
 		// NS address should be a valid hostname
 		if err := ValidateHostname(record.Address); err != nil {
 			return errors.NewInvalidInput("address", fmt.Sprintf("NS record must have valid hostname: %v", err))
@@ -295,7 +238,7 @@ func (s *Service) ValidateRecord(record Record) error {
 // BulkOperation represents a bulk DNS operation
 type BulkOperation struct {
 	Action string // Use BulkActionAdd, BulkActionUpdate, or BulkActionDelete constants
-	Record Record
+	Record dnsrecord.Record
 }
 
 // BulkUpdate performs multiple DNS operations in a single API call
@@ -306,7 +249,7 @@ func (s *Service) BulkUpdate(domainName string, operations []BulkOperation) erro
 		return fmt.Errorf("failed to get existing records: %w", err)
 	}
 
-	records := make([]Record, len(existingRecords))
+	records := make([]dnsrecord.Record, len(existingRecords))
 	copy(records, existingRecords)
 
 	// Apply operations
@@ -335,7 +278,7 @@ func (s *Service) BulkUpdate(domainName string, operations []BulkOperation) erro
 			}
 
 		case BulkActionDelete:
-			var filteredRecords []Record
+			var filteredRecords []dnsrecord.Record
 			found := false
 			for _, record := range records {
 				if record.HostName == op.Record.HostName && record.RecordType == op.Record.RecordType {

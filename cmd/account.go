@@ -5,21 +5,21 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"namecheap-dns-manager/pkg/config"
+	"zonekit/pkg/config"
 )
 
 // accountCmd represents the account command
 var accountCmd = &cobra.Command{
 	Use:   "account",
-	Short: "Manage multiple Namecheap accounts",
-	Long:  `Commands for managing multiple Namecheap account configurations.`,
+	Short: "Manage multiple DNS provider accounts",
+	Long:  `Commands for managing multiple DNS provider account configurations.`,
 }
 
 // accountListCmd represents the account list command
 var accountListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all configured accounts",
-	Long:  `Display all configured Namecheap accounts and show which one is currently active.`,
+	Long:  `Display all configured DNS provider accounts and show which one is currently active.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		configManager, err := config.NewManager()
 		if err != nil {
@@ -29,7 +29,7 @@ var accountListCmd = &cobra.Command{
 		accounts := configManager.ListAccounts()
 		if len(accounts) == 0 {
 			fmt.Println("No accounts configured.")
-			fmt.Println("Run 'namecheap-dns account add' to add your first account.")
+			fmt.Println("Run 'zonekit account add' to add your first account.")
 			return nil
 		}
 
@@ -74,7 +74,7 @@ var accountListCmd = &cobra.Command{
 var accountAddCmd = &cobra.Command{
 	Use:   "add [account-name]",
 	Short: "Add a new account configuration",
-	Long:  `Add a new Namecheap account configuration with an interactive prompt.`,
+	Long:  `Add a new DNS provider account configuration with an interactive prompt.`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		configManager, err := config.NewManager()
@@ -100,7 +100,7 @@ var accountAddCmd = &cobra.Command{
 		// Interactive input
 		account := &config.AccountConfig{}
 
-		fmt.Print("Namecheap Username: ")
+		fmt.Print("Provider Username: ")
 		fmt.Scanln(&account.Username)
 
 		fmt.Print("API User: ")
@@ -151,7 +151,7 @@ var accountAddCmd = &cobra.Command{
 var accountSwitchCmd = &cobra.Command{
 	Use:   "switch [account-name]",
 	Short: "Switch to a different account",
-	Long:  `Switch to a different configured Namecheap account.`,
+	Long:  `Switch to a different configured DNS provider account.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		accountName := args[0]
@@ -191,7 +191,7 @@ var accountSwitchCmd = &cobra.Command{
 var accountRemoveCmd = &cobra.Command{
 	Use:   "remove [account-name]",
 	Short: "Remove an account configuration",
-	Long:  `Remove a Namecheap account configuration. Cannot remove the last remaining account.`,
+	Long:  `Remove a DNS provider account configuration. Cannot remove the last remaining account.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		accountName := args[0]
@@ -244,7 +244,7 @@ var accountRemoveCmd = &cobra.Command{
 var accountShowCmd = &cobra.Command{
 	Use:   "show [account-name]",
 	Short: "Show details of a specific account",
-	Long:  `Display detailed information about a specific Namecheap account configuration.`,
+	Long:  `Display detailed information about a specific DNS provider account configuration.`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		configManager, err := config.NewManager()
@@ -293,7 +293,7 @@ var accountShowCmd = &cobra.Command{
 var accountEditCmd = &cobra.Command{
 	Use:   "edit [account-name]",
 	Short: "Edit an existing account configuration",
-	Long:  `Edit an existing Namecheap account configuration with an interactive prompt.`,
+	Long:  `Edit an existing DNS provider account configuration with an interactive prompt.`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		configManager, err := config.NewManager()
@@ -322,7 +322,7 @@ var accountEditCmd = &cobra.Command{
 		// Interactive input with current values as defaults
 		account := &config.AccountConfig{}
 
-		fmt.Printf("Namecheap Username [%s]: ", existingAccount.Username)
+		fmt.Printf("Provider Username [%s]: ", existingAccount.Username)
 		var input string
 		fmt.Scanln(&input)
 		if input != "" {

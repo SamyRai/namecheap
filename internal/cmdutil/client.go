@@ -3,8 +3,8 @@ package cmdutil
 import (
 	"fmt"
 
-	"namecheap-dns-manager/pkg/client"
-	"namecheap-dns-manager/pkg/config"
+	"zonekit/pkg/client"
+	"zonekit/pkg/config"
 )
 
 // CreateClient creates a client from an account configuration.

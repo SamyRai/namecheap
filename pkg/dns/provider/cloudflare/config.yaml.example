@@ -1,0 +1,47 @@
+# Example Cloudflare DNS Provider Configuration
+# This shows how a REST-based provider could be configured
+
+name: cloudflare
+display_name: Cloudflare
+type: rest  # Uses generic REST adapter
+
+auth:
+  method: api_key
+  credentials:
+    api_key: "${CLOUDFLARE_API_KEY}"
+    email: "${CLOUDFLARE_EMAIL}"
+
+api:
+  base_url: "https://api.cloudflare.com/client/v4"
+  endpoints:
+    get_records: "/zones/{zone_id}/dns_records"
+    create_record: "/zones/{zone_id}/dns_records"
+    update_record: "/zones/{zone_id}/dns_records/{record_id}"
+    delete_record: "/zones/{zone_id}/dns_records/{record_id}"
+  headers:
+    X-Auth-Email: "${CLOUDFLARE_EMAIL}"
+    X-Auth-Key: "${CLOUDFLARE_API_KEY}"
+    Content-Type: "application/json"
+  timeout: 30
+  retries: 3
+
+mappings:
+  request:
+    hostname: "name"
+    record_type: "type"
+    address: "content"
+    ttl: "ttl"
+    mx_pref: "priority"
+  response:
+    hostname: "name"
+    record_type: "type"
+    address: "content"
+    ttl: "ttl"
+    mx_pref: "priority"
+  list_path: "result"
+
+settings:
+  # Cloudflare-specific settings
+  zone_id_required: true  # Need zone_id for API calls
+  proxied: false  # Default proxy setting
+
