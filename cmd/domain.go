@@ -6,22 +6,22 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
-	"namecheap-dns-manager/internal/cmdutil"
-	"namecheap-dns-manager/pkg/domain"
+	"zonekit/internal/cmdutil"
+	"zonekit/pkg/domain"
 )
 
 // domainCmd represents the domain command
 var domainCmd = &cobra.Command{
 	Use:   "domain",
-	Short: "Manage Namecheap domains",
-	Long:  `Commands for managing Namecheap domains including listing, checking availability, and basic domain operations.`,
+	Short: "Manage domains",
+	Long:  `Commands for managing domains including listing, checking availability, and basic domain operations.`,
 }
 
 // domainListCmd represents the domain list command
 var domainListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all domains",
-	Long:  `List all domains in your Namecheap account with their details.`,
+	Long:  `List all domains in your account with their details.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get current account configuration
 		accountConfig, err := GetCurrentAccount()
@@ -62,7 +62,7 @@ var domainListCmd = &cobra.Command{
 			}
 			dns := "External"
 			if d.IsOurDNS {
-				dns = "Namecheap"
+				dns = "Provider"
 			}
 
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
@@ -115,7 +115,7 @@ var domainInfoCmd = &cobra.Command{
 		fmt.Printf("Locked: %t\n", domainInfo.IsLocked)
 		fmt.Printf("WhoisGuard: %s\n", domainInfo.WhoisGuard)
 		fmt.Printf("Premium: %t\n", domainInfo.IsPremium)
-		fmt.Printf("Using Namecheap DNS: %t\n", domainInfo.IsOurDNS)
+		fmt.Printf("Using Provider DNS: %t\n", domainInfo.IsOurDNS)
 
 		return nil
 	},
@@ -254,8 +254,8 @@ var domainNameserversSetCmd = &cobra.Command{
 // domainNameserversDefaultCmd represents the domain nameservers default command
 var domainNameserversDefaultCmd = &cobra.Command{
 	Use:   "default <domain>",
-	Short: "Set domain to use Namecheap DNS",
-	Long:  `Set the domain to use Namecheap's default DNS servers.`,
+	Short: "Set domain to use provider DNS",
+	Long:  `Set the domain to use the provider's default DNS servers.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domainName := args[0]
@@ -281,10 +281,10 @@ var domainNameserversDefaultCmd = &cobra.Command{
 		domainService := domain.NewService(client)
 		err = domainService.SetToNamecheapDNS(domainName)
 		if err != nil {
-			return fmt.Errorf("failed to set to Namecheap DNS: %w", err)
+			return fmt.Errorf("failed to set to provider DNS: %w", err)
 		}
 
-		fmt.Printf("Successfully set %s to use Namecheap DNS servers.\n", domainName)
+		fmt.Printf("Successfully set %s to use provider DNS servers.\n", domainName)
 		return nil
 	},
 }

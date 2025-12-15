@@ -8,8 +8,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// AccountConfig represents a single Namecheap account configuration
+// AccountConfig represents a single DNS provider account configuration
 type AccountConfig struct {
+	// Provider specifies which DNS provider to use (e.g., "namecheap", "cloudflare")
+	// Defaults to "namecheap" if not specified for backward compatibility
+	Provider    string `yaml:"provider,omitempty" mapstructure:"provider,omitempty"`
 	Username    string `yaml:"username" mapstructure:"username"`
 	APIUser     string `yaml:"api_user" mapstructure:"api_user"`
 	APIKey      string `yaml:"api_key" mapstructure:"api_key"`
@@ -87,7 +90,7 @@ func findHomeConfigPath() string {
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(home, ".namecheap-dns.yaml")
+	return filepath.Join(home, ".zonekit.yaml")
 }
 
 // Load reads the configuration from file
@@ -240,9 +243,9 @@ func (m *Manager) GetConfigPath() string {
 // GetConfigLocation returns a human-readable description of where the config is located
 func (m *Manager) GetConfigLocation() string {
 	if filepath.Dir(m.configPath) == filepath.Join(os.Getenv("HOME"), "configs") {
-		return "project directory (configs/.namecheap-dns.yaml)"
+		return "project directory (configs/.zonekit.yaml)"
 	}
-	return "home directory (~/.namecheap-dns.yaml)"
+	return "home directory (~/.zonekit.yaml)"
 }
 
 // GetCurrentAccountName returns the name of the currently selected account
@@ -255,7 +258,8 @@ func (m *Manager) createDefaultConfig() *Config {
 	return &Config{
 		Accounts: map[string]*AccountConfig{
 			"default": {
-				Username:    "your-namecheap-username",
+				Provider:    "namecheap", // Default provider for backward compatibility
+				Username:    "your-provider-username",
 				APIUser:     "your-api-username",
 				APIKey:      "your-api-key-here",
 				ClientIP:    "your.public.ip.address",
@@ -275,6 +279,7 @@ func (m *Manager) migrateLegacyConfig() error {
 
 		// Create default account from legacy fields
 		defaultAccount := &AccountConfig{
+			Provider:    "namecheap", // Default provider for migrated legacy configs
 			Username:    m.config.Username,
 			APIUser:     m.config.APIUser,
 			APIKey:      m.config.APIKey,
@@ -306,6 +311,14 @@ func (m *Manager) migrateLegacyConfig() error {
 	}
 
 	return nil
+}
+
+// GetProvider returns the provider name for an account, defaulting to "namecheap" for backward compatibility
+func (a *AccountConfig) GetProvider() string {
+	if a.Provider == "" {
+		return "namecheap" // Default provider for backward compatibility
+	}
+	return a.Provider
 }
 
 // ValidateAccount validates an account configuration

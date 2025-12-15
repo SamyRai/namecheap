@@ -1,4 +1,4 @@
-# Namecheap DNS Manager
+# ZoneKit
 
 <div align="center">
 
@@ -7,9 +7,9 @@
 ![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
-A command-line interface for managing Namecheap domains and DNS records with **multi-account support**.
+A command-line interface for managing DNS zones and records across multiple providers with **multi-account support**.
 
-[Installation](#-quick-start) • [Documentation](https://github.com/SamyRai/namecheap/wiki) • [Issues](https://github.com/SamyRai/namecheap/issues) • [Releases](https://github.com/SamyRai/namecheap/releases)
+[Installation](#-quick-start) • [Documentation](https://github.com/SamyRai/zonekit/wiki) • [Issues](https://github.com/SamyRai/zonekit/issues) • [Releases](https://github.com/SamyRai/zonekit/releases)
 
 </div>
 
@@ -19,7 +19,7 @@ A command-line interface for managing Namecheap domains and DNS records with **m
 
 > **Warning**
 >
-> **This is NOT an official Namecheap tool.** This is an independent, community-maintained project.
+> **This is an independent, community-maintained project.**
 >
 > **Current Status: Pre-1.0.0 Release (v0.1.0)**
 >
@@ -40,7 +40,8 @@ A command-line interface for managing Namecheap domains and DNS records with **m
 
 | Feature | Description |
 |---------|-------------|
-| **Multi-Account Management** | Configure and switch between multiple Namecheap accounts |
+| **Multi-Provider Support** | Support for multiple DNS providers (Namecheap, Cloudflare, and more) |
+| **Multi-Account Management** | Configure and switch between multiple provider accounts |
 | **Domain Management** | List, check, and manage your domains |
 | **DNS Management** | Create, update, and delete DNS records |
 | **Bulk Operations** | Perform multiple DNS operations at once |
@@ -57,14 +58,14 @@ A command-line interface for managing Namecheap domains and DNS records with **m
 
 ```bash
 # Clone the repository
-git clone https://github.com/SamyRai/namecheap.git
+git clone https://github.com/SamyRai/zonekit.git
 cd namecheap
 
 # Build the binary
 make build
 
 # Or build directly
-go build -o namecheap-dns ./main.go
+go build -o zonekit ./main.go
 ```
 
 ### 2. Configuration
@@ -73,33 +74,33 @@ The tool automatically detects configuration files in this priority order:
 
 | Priority | Location | Use Case |
 |----------|----------|----------|
-| **1** | `./configs/.namecheap-dns.yaml` | Development |
-| **2** | `~/.namecheap-dns.yaml` | Production |
+| **1** | `./configs/.zonekit.yaml` | Development |
+| **2** | `~/.zonekit.yaml` | Production |
 
 ```bash
 # Initialize configuration
-./namecheap-dns config init
+./zonekit config init
 
 # Or add account interactively
-./namecheap-dns account add
+./zonekit account add
 ```
 
 ### 3. Test Your Setup
 
 ```bash
 # List accounts
-./namecheap-dns account list
+./zonekit account list
 
 # List domains
-./namecheap-dns domain list
+./zonekit domain list
 
 # Use specific account
-./namecheap-dns --account work domain list
+./zonekit --account work domain list
 ```
 
 </details>
 
-> **For detailed documentation, see the [Wiki](https://github.com/SamyRai/namecheap/wiki)**
+> **For detailed documentation, see the [Wiki](https://github.com/SamyRai/zonekit/wiki)**
 
 ## Commands
 
@@ -148,7 +149,7 @@ The tool automatically detects configuration files in this priority order:
 
 </details>
 
-> **For complete command reference, see [Usage Guide](https://github.com/SamyRai/namecheap/wiki/Usage)**
+> **For complete command reference, see [Usage Guide](https://github.com/SamyRai/zonekit/wiki/Usage)**
 
 ## Security
 
@@ -162,15 +163,15 @@ The tool automatically detects configuration files in this priority order:
 The tool automatically detects configuration files in this priority order:
 
 1. **Project Directory** (Recommended for development):
-   - `./configs/.namecheap-dns.yaml`
+   - `./configs/.zonekit.yaml`
    - Automatically found when running from project directory
 
 2. **Home Directory** (Fallback):
-   - `~/.namecheap-dns.yaml`
+   - `~/.zonekit.yaml`
    - Used when no project config is found
 
 3. **Custom Location**:
-   - `./namecheap-dns --config /path/to/config.yaml`
+   - `./zonekit --config /path/to/config.yaml`
 
 ## Pro Tips
 
@@ -178,20 +179,20 @@ The tool automatically detects configuration files in this priority order:
 
 ```bash
 # 1. Add multiple accounts
-./namecheap-dns account add personal
-./namecheap-dns account add work
-./namecheap-dns account add client1
+./zonekit account add personal
+./zonekit account add work
+./zonekit account add client1
 
 # 2. Switch between accounts
-./namecheap-dns account switch work
-./namecheap-dns domain list
+./zonekit account switch work
+./zonekit domain list
 
-./namecheap-dns account switch personal
-./namecheap-dns domain list
+./zonekit account switch personal
+./zonekit domain list
 
 # 3. Use specific account for one-off commands
-./namecheap-dns --account work dns list example.com
-./namecheap-dns --account personal domain check newdomain.com
+./zonekit --account work dns list example.com
+./zonekit --account personal domain check newdomain.com
 ```
 
 ### Account Organization
@@ -206,11 +207,11 @@ The tool automatically detects configuration files in this priority order:
 ### Common Issues
 
 1. **"No config file found"**
-   - Run `./namecheap-dns config init` to create a config file
+   - Run `./zonekit config init` to create a config file
    - Ensure the config file is in the correct location
 
 2. **"Account not found"**
-   - Check available accounts with `./namecheap-dns account list`
+   - Check available accounts with `./zonekit account list`
    - Verify account names are correct
 
 3. **API Connection Errors**
@@ -222,12 +223,12 @@ The tool automatically detects configuration files in this priority order:
 
 ```bash
 # Help
-./namecheap-dns help
+./zonekit help
 
 # Command-specific help
-./namecheap-dns account --help
-./namecheap-dns domain --help
-./namecheap-dns dns --help
+./zonekit account --help
+./zonekit domain --help
+./zonekit dns --help
 ```
 
 ## Migration from Legacy Config
@@ -255,7 +256,7 @@ namecheap/
 
 ```bash
 # Development build
-go build -o namecheap-dns cmd/main.go
+go build -o zonekit cmd/main.go
 
 # Production build
 make build
@@ -280,5 +281,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 For issues and questions:
 - Check the troubleshooting section above
-- Review the help command: `./namecheap-dns help`
+- Review the help command: `./zonekit help`
 - Open an issue on GitHub

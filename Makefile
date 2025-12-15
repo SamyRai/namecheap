@@ -1,9 +1,9 @@
-# Namecheap DNS Manager Makefile
+# ZoneKit Makefile
 
 .PHONY: build test clean install lint fmt vet deps help
 
 # Variables
-BINARY_NAME=namecheap-dns
+BINARY_NAME=zonekit
 MAIN_PATH=./main.go
 BUILD_DIR=build
 GOFLAGS=-ldflags="-w -s"

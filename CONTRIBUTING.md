@@ -1,13 +1,13 @@
-# Contributing to Namecheap DNS Manager
+# Contributing to ZoneKit
 
 Thank you for your interest in contributing! This document provides guidelines and instructions for contributing to the project.
 
 ## Quick Links
 
-- [Wiki Contributing Guide](https://github.com/SamyRai/namecheap/wiki/Contributing) - Complete contributing documentation
+- [Wiki Contributing Guide](https://github.com/SamyRai/zonekit/wiki/Contributing) - Complete contributing documentation
 - [Code of Conduct](.github/CODE_OF_CONDUCT.md) - Community standards
-- [Issues](https://github.com/SamyRai/namecheap/issues) - Report bugs or request features
-- [Pull Requests](https://github.com/SamyRai/namecheap/pulls) - Submit contributions
+- [Issues](https://github.com/SamyRai/zonekit/issues) - Report bugs or request features
+- [Pull Requests](https://github.com/SamyRai/zonekit/pulls) - Submit contributions
 
 ## How to Contribute
 
@@ -20,7 +20,7 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 ## Development Setup
 
-See the [Wiki Contributing Guide](https://github.com/SamyRai/namecheap/wiki/Contributing) for detailed setup instructions.
+See the [Wiki Contributing Guide](https://github.com/SamyRai/zonekit/wiki/Contributing) for detailed setup instructions.
 
 ## Code Standards
 
@@ -43,9 +43,9 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ## Questions?
 
-- Check the [Wiki](https://github.com/SamyRai/namecheap/wiki)
-- Open an [Issue](https://github.com/SamyRai/namecheap/issues)
-- Review existing [Pull Requests](https://github.com/SamyRai/namecheap/pulls)
+- Check the [Wiki](https://github.com/SamyRai/zonekit/wiki)
+- Open an [Issue](https://github.com/SamyRai/zonekit/issues)
+- Review existing [Pull Requests](https://github.com/SamyRai/zonekit/pulls)
 
-For complete contributing guidelines, see the [Wiki Contributing Guide](https://github.com/SamyRai/namecheap/wiki/Contributing).
+For complete contributing guidelines, see the [Wiki Contributing Guide](https://github.com/SamyRai/zonekit/wiki/Contributing).
 

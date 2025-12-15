@@ -1,19 +1,20 @@
 package plugin
 
 import (
-	"namecheap-dns-manager/pkg/dns"
+	"zonekit/pkg/dns"
+	"zonekit/pkg/dnsrecord"
 )
 
 // Service defines the DNS service interface for plugins
 type Service interface {
-	GetRecords(domainName string) ([]dns.Record, error)
-	GetRecordsByType(domainName string, recordType string) ([]dns.Record, error)
-	SetRecords(domainName string, records []dns.Record) error
-	AddRecord(domainName string, record dns.Record) error
-	UpdateRecord(domainName string, hostname, recordType string, newRecord dns.Record) error
+	GetRecords(domainName string) ([]dnsrecord.Record, error)
+	GetRecordsByType(domainName string, recordType string) ([]dnsrecord.Record, error)
+	SetRecords(domainName string, records []dnsrecord.Record) error
+	AddRecord(domainName string, record dnsrecord.Record) error
+	UpdateRecord(domainName string, hostname, recordType string, newRecord dnsrecord.Record) error
 	DeleteRecord(domainName string, hostname, recordType string) error
 	DeleteAllRecords(domainName string) error
-	ValidateRecord(record dns.Record) error
+	ValidateRecord(record dnsrecord.Record) error
 	BulkUpdate(domainName string, operations []dns.BulkOperation) error
 }
 
@@ -77,7 +78,7 @@ type OutputWriter interface {
 
 // SetupResult represents the result of a setup operation
 type SetupResult struct {
-	Records   []dns.Record
+	Records   []dnsrecord.Record
 	Conflicts []Conflict
 	NextSteps []string
 	DryRun    bool
@@ -88,8 +89,8 @@ type SetupResult struct {
 type Conflict struct {
 	HostName   string
 	RecordType string
-	Existing   dns.Record
-	New        dns.Record
+	Existing   dnsrecord.Record
+	New        dnsrecord.Record
 }
 
 // VerificationResult represents the result of a verification operation

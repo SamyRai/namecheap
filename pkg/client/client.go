@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/namecheap/go-namecheap-sdk/v2/namecheap"
-	"namecheap-dns-manager/pkg/config"
+	"zonekit/pkg/config"
 )
 
 // Client wraps the Namecheap SDK client with additional functionality
