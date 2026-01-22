@@ -305,4 +305,3 @@ func (s *Spec) extractMappings() *dnsprovider.FieldMappings {
 
 	return mappings
 }
-

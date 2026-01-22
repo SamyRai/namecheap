@@ -101,4 +101,3 @@ func (s *Suite) AssertEmpty(object interface{}, msgAndArgs ...interface{}) {
 func (s *Suite) AssertNotEmpty(object interface{}, msgAndArgs ...interface{}) {
 	s.Require().NotEmpty(object, msgAndArgs...)
 }
-

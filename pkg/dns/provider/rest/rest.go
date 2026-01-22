@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	dnsprovider "zonekit/pkg/dns/provider"
 	httpprovider "zonekit/pkg/dns/provider/http"
 	"zonekit/pkg/dns/provider/mapper"
 	"zonekit/pkg/dnsrecord"
-	dnsprovider "zonekit/pkg/dns/provider"
 	"zonekit/pkg/errors"
 )
 
@@ -143,7 +143,7 @@ func (p *RESTProvider) createRecord(ctx context.Context, domainName string, reco
 
 	resp, err := p.client.Post(ctx, endpoint, body)
 	if err != nil {
-		return errors.NewAPI("CreateRecord", fmt.Sprintf("failed to create DNS record"), err)
+		return errors.NewAPI("CreateRecord", "failed to create DNS record", err)
 	}
 	defer resp.Body.Close()
 
@@ -176,7 +176,7 @@ func (p *RESTProvider) deleteRecord(ctx context.Context, domainName string, reco
 
 	resp, err := p.client.Delete(ctx, endpoint)
 	if err != nil {
-		return errors.NewAPI("DeleteRecord", fmt.Sprintf("failed to delete DNS record"), err)
+		return errors.NewAPI("DeleteRecord", "failed to delete DNS record", err)
 	}
 	defer resp.Body.Close()
 
@@ -218,4 +218,3 @@ func (p *RESTProvider) getZoneID(domainName string) (string, error) {
 
 // Ensure RESTProvider implements Provider interface
 var _ dnsprovider.Provider = (*RESTProvider)(nil)
-

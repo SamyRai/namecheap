@@ -46,4 +46,3 @@ func (s *VersionTestSuite) TestIsMajorRelease() {
 	result := IsMajorRelease()
 	s.Require().False(result, "Version 0.1.0 should not be considered major release")
 }
-

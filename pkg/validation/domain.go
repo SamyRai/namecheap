@@ -32,4 +32,3 @@ func ValidateDomain(domain string) error {
 
 	return nil
 }
-

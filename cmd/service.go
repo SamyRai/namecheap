@@ -270,4 +270,3 @@ func init() {
 	serviceSetupCmd.Flags().Bool("replace", false, "Replace existing records")
 	serviceRemoveCmd.Flags().BoolP("confirm", "y", false, "Confirm the operation")
 }
-

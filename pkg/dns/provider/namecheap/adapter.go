@@ -5,8 +5,8 @@ import (
 
 	"github.com/namecheap/go-namecheap-sdk/v2/namecheap"
 	"zonekit/pkg/client"
-	"zonekit/pkg/dnsrecord"
 	dnsprovider "zonekit/pkg/dns/provider"
+	"zonekit/pkg/dnsrecord"
 	"zonekit/pkg/errors"
 	"zonekit/pkg/pointer"
 )
@@ -121,4 +121,3 @@ func Register(client *client.Client) error {
 	provider := New(client)
 	return dnsprovider.Register(provider)
 }
-

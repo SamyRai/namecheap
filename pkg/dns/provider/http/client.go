@@ -220,4 +220,3 @@ func ParseJSONResponse(resp *http.Response, target interface{}) error {
 
 	return nil
 }
-

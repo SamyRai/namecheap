@@ -72,23 +72,23 @@ func (s *ServiceTestSuite) TestService_ValidateRecord_ValidRecords() {
 		record dnsrecord.Record
 	}{
 		{
-			name: "valid A record",
+			name:   "valid A record",
 			record: convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
 		},
 		{
-			name: "valid AAAA record",
+			name:   "valid AAAA record",
 			record: convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeAAAA, "2001:0db8:85a3:0000:0000:8a2e:0370:7334", 1800, 0)),
 		},
 		{
-			name: "valid MX record",
+			name:   "valid MX record",
 			record: convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeMX, "mail.example.com", 1800, 10)),
 		},
 		{
-			name: "valid CNAME record",
+			name:   "valid CNAME record",
 			record: convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeCNAME, "example.com", 1800, 0)),
 		},
 		{
-			name: "valid TXT record",
+			name:   "valid TXT record",
 			record: convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeTXT, "v=spf1 include:_spf.example.com ~all", 1800, 0)),
 		},
 	}

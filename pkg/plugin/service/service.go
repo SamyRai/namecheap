@@ -49,28 +49,28 @@ Available services can be listed with: service list`,
 			Execute: p.setup,
 		},
 		{
-			Name:        "verify",
-			Description: "Verify DNS records for a service integration",
+			Name:            "verify",
+			Description:     "Verify DNS records for a service integration",
 			LongDescription: "Check if all required DNS records for a service integration are properly configured.",
-			Execute:     p.verify,
+			Execute:         p.verify,
 		},
 		{
-			Name:        "remove",
-			Description: "Remove DNS records for a service integration",
+			Name:            "remove",
+			Description:     "Remove DNS records for a service integration",
 			LongDescription: "Remove all service-related DNS records from the specified domain.",
-			Execute:     p.remove,
+			Execute:         p.remove,
 		},
 		{
-			Name:        "list",
-			Description: "List all available service integrations",
+			Name:            "list",
+			Description:     "List all available service integrations",
 			LongDescription: "List all configured service integrations.",
-			Execute:     p.list,
+			Execute:         p.list,
 		},
 		{
-			Name:        "info",
-			Description: "Show service integration information",
+			Name:            "info",
+			Description:     "Show service integration information",
 			LongDescription: "Display detailed information about a specific service integration.",
-			Execute:     p.info,
+			Execute:         p.info,
 		},
 	}
 }
@@ -153,7 +153,7 @@ func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 	}
 
 	// Apply changes
-		var allRecords []dnsrecord.Record
+	var allRecords []dnsrecord.Record
 	if replace {
 		allRecords = records
 	} else {
@@ -305,7 +305,7 @@ func (p *ServicePlugin) remove(ctx *plugin.Context) error {
 	}
 
 	// Filter out service records
-		var filteredRecords []dnsrecord.Record
+	var filteredRecords []dnsrecord.Record
 	removedCount := 0
 
 	for _, record := range records {
@@ -492,14 +492,15 @@ func (p *ServicePlugin) generateRecords(config *Config, domainName string) []dns
 			ttl = dns.DefaultTTL
 		}
 
-		if config.Records.Autodiscover.Type == "CNAME" {
+		switch config.Records.Autodiscover.Type {
+		case "CNAME":
 			records = append(records, dnsrecord.Record{
 				HostName:   config.Records.Autodiscover.Hostname,
 				RecordType: dnsrecord.RecordTypeCNAME,
 				Address:    ensureTrailingDot(config.Records.Autodiscover.CNAME),
 				TTL:        ttl,
 			})
-		} else if config.Records.Autodiscover.Type == "SRV" {
+		case "SRV":
 			// SRV records are more complex, for now we'll use CNAME
 			// Full SRV support can be added later
 			if config.Records.Autodiscover.Target != "" {
@@ -550,4 +551,3 @@ func ensureTrailingDot(hostname string) string {
 	}
 	return hostname
 }
-
