@@ -11,22 +11,22 @@ import (
 
 // Config represents a service integration configuration
 type Config struct {
-	Name        string   `yaml:"name"`
-	DisplayName string   `yaml:"display_name"`
-	Description string   `yaml:"description"`
-	Category    string   `yaml:"category"` // email, cdn, hosting, etc.
-	Records     Records  `yaml:"records"`
+	Name         string        `yaml:"name"`
+	DisplayName  string        `yaml:"display_name"`
+	Description  string        `yaml:"description"`
+	Category     string        `yaml:"category"` // email, cdn, hosting, etc.
+	Records      Records       `yaml:"records"`
 	Verification *Verification `yaml:"verification,omitempty"`
 }
 
 // Records defines all DNS records for a service integration
 type Records struct {
-	MX          []MXRecord          `yaml:"mx,omitempty"`
-	SPF         *TXTRecord          `yaml:"spf,omitempty"`
-	DKIM        []DKIMRecord        `yaml:"dkim,omitempty"`
-	DMARC       *TXTRecord          `yaml:"dmarc,omitempty"`
+	MX           []MXRecord          `yaml:"mx,omitempty"`
+	SPF          *TXTRecord          `yaml:"spf,omitempty"`
+	DKIM         []DKIMRecord        `yaml:"dkim,omitempty"`
+	DMARC        *TXTRecord          `yaml:"dmarc,omitempty"`
 	Autodiscover *AutodiscoverRecord `yaml:"autodiscover,omitempty"`
-	Custom      []CustomRecord      `yaml:"custom,omitempty"`
+	Custom       []CustomRecord      `yaml:"custom,omitempty"`
 }
 
 // MXRecord represents an MX record
@@ -83,10 +83,10 @@ type Verification struct {
 
 // VerificationCheck defines a single verification check
 type VerificationCheck struct {
-	Type     string `yaml:"type"`
-	Hostname string `yaml:"hostname"`
-	Contains string `yaml:"contains,omitempty"`
-	Equals   string `yaml:"equals,omitempty"`
+	Type       string `yaml:"type"`
+	Hostname   string `yaml:"hostname"`
+	Contains   string `yaml:"contains,omitempty"`
+	Equals     string `yaml:"equals,omitempty"`
 	StartsWith string `yaml:"starts_with,omitempty"`
 }
 
@@ -212,4 +212,3 @@ func (c *Config) Validate() error {
 
 	return nil
 }
-

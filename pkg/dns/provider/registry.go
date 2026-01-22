@@ -82,4 +82,3 @@ func Clear() {
 
 	registry = make(map[string]Provider)
 }
-

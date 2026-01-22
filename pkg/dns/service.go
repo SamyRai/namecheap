@@ -48,7 +48,6 @@ func NewServiceWithProviderName(providerName string) (*Service, error) {
 	}, nil
 }
 
-
 // GetRecords retrieves all DNS records for a domain
 func (s *Service) GetRecords(domainName string) ([]dnsrecord.Record, error) {
 	return s.provider.GetRecords(domainName)

@@ -34,4 +34,3 @@ func CleanupTestDir(t *testing.T, path string) {
 		t.Logf("Failed to cleanup test directory %s: %v", path, err)
 	}
 }
-

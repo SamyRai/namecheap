@@ -196,4 +196,3 @@ func convertArrayToMaps(arr []interface{}) ([]map[string]interface{}, error) {
 
 	return result, nil
 }
-

@@ -227,4 +227,3 @@ func (s *RegistryTestSuite) TestConcurrentAccess() {
 	providers := List()
 	s.Require().Len(providers, 2)
 }
-

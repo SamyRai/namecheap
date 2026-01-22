@@ -96,4 +96,3 @@ func (s *ErrorsTestSuite) TestErrAPI_WithoutUnderlyingError() {
 	unwrapped := err.Unwrap()
 	s.Require().Nil(unwrapped)
 }
-

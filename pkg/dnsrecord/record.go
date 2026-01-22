@@ -19,4 +19,3 @@ const (
 	RecordTypeNS    = "NS"
 	RecordTypeSRV   = "SRV"
 )
-

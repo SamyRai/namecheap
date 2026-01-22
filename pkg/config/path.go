@@ -30,4 +30,3 @@ func FindProjectConfigPath() string {
 
 	return ""
 }
-

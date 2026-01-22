@@ -39,11 +39,11 @@ type Config struct {
 
 	// API configuration
 	API struct {
-		BaseURL    string            `yaml:"base_url"`
-		Endpoints  map[string]string `yaml:"endpoints"` // e.g., "get_records": "/api/v1/dns/records"
-		Headers    map[string]string `yaml:"headers,omitempty"`
-		Timeout    int               `yaml:"timeout,omitempty"` // seconds
-		Retries    int               `yaml:"retries,omitempty"`
+		BaseURL   string            `yaml:"base_url"`
+		Endpoints map[string]string `yaml:"endpoints"` // e.g., "get_records": "/api/v1/dns/records"
+		Headers   map[string]string `yaml:"headers,omitempty"`
+		Timeout   int               `yaml:"timeout,omitempty"` // seconds
+		Retries   int               `yaml:"retries,omitempty"`
 	} `yaml:"api"`
 
 	// Provider-specific settings
@@ -57,9 +57,9 @@ type Config struct {
 type FieldMappings struct {
 	// Request mappings (our format -> provider format)
 	Request struct {
-		HostName   string `yaml:"hostname,omitempty"`   // e.g., "name" or "host"
+		HostName   string `yaml:"hostname,omitempty"`    // e.g., "name" or "host"
 		RecordType string `yaml:"record_type,omitempty"` // e.g., "type" or "rtype"
-		Address    string `yaml:"address,omitempty"`    // e.g., "value" or "content"
+		Address    string `yaml:"address,omitempty"`     // e.g., "value" or "content"
 		TTL        string `yaml:"ttl,omitempty"`
 		MXPref     string `yaml:"mx_pref,omitempty"` // e.g., "priority" or "preference"
 	} `yaml:"request,omitempty"`
@@ -76,4 +76,3 @@ type FieldMappings struct {
 	// List response structure (for REST providers)
 	ListPath string `yaml:"list_path,omitempty"` // JSON path to records array, e.g., "data.records"
 }
-

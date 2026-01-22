@@ -129,9 +129,7 @@ func (s *Service) GetNameservers(domainName string) ([]string, error) {
 	}
 
 	nameservers := make([]string, 0, len(*resp.DomainDNSGetListResult.Nameservers))
-	for _, ns := range *resp.DomainDNSGetListResult.Nameservers {
-		nameservers = append(nameservers, ns)
-	}
+	nameservers = append(nameservers, *resp.DomainDNSGetListResult.Nameservers...)
 
 	return nameservers, nil
 }

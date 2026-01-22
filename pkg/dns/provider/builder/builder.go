@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	httpprovider "zonekit/pkg/dns/provider/http"
+	dnsprovider "zonekit/pkg/dns/provider"
 	"zonekit/pkg/dns/provider/auth"
+	httpprovider "zonekit/pkg/dns/provider/http"
 	"zonekit/pkg/dns/provider/mapper"
 	"zonekit/pkg/dns/provider/rest"
-	dnsprovider "zonekit/pkg/dns/provider"
 )
 
 // BuildProvider creates a DNS provider from configuration
@@ -187,4 +187,3 @@ func validateConfig(config *dnsprovider.Config) error {
 
 	return nil
 }
-

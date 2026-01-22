@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
+	dnsprovider "zonekit/pkg/dns/provider"
 	"zonekit/pkg/dns/provider/builder"
 	"zonekit/pkg/dns/provider/openapi"
-	dnsprovider "zonekit/pkg/dns/provider"
 )
 
 // DiscoverAndRegister discovers all providers from subdirectories and registers them
@@ -34,7 +34,7 @@ func DiscoverAndRegister(baseDir string) error {
 		// Skip hidden directories and special directories
 		name := entry.Name()
 		if name[0] == '.' || name == "auth" || name == "builder" || name == "config" ||
-		   name == "http" || name == "mapper" || name == "rest" || name == "autodiscover" {
+			name == "http" || name == "mapper" || name == "rest" || name == "autodiscover" {
 			continue
 		}
 
@@ -90,8 +90,8 @@ func DiscoverAndRegister(baseDir string) error {
 func findProviderDirectory() string {
 	// Try multiple locations
 	locations := []string{
-		"pkg/dns/provider",                    // From project root
-		"./pkg/dns/provider",                  // Relative to current dir
+		"pkg/dns/provider",                            // From project root
+		"./pkg/dns/provider",                          // Relative to current dir
 		filepath.Join("..", "pkg", "dns", "provider"), // From internal dirs
 	}
 
@@ -112,4 +112,3 @@ func findProviderDirectory() string {
 
 	return ""
 }
-

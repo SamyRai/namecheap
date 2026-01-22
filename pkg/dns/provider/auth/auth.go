@@ -10,11 +10,11 @@ import (
 type Method string
 
 const (
-	MethodAPIKey  Method = "api_key"
-	MethodOAuth   Method = "oauth"
-	MethodBasic   Method = "basic"
-	MethodBearer  Method = "bearer"
-	MethodCustom  Method = "custom"
+	MethodAPIKey Method = "api_key"
+	MethodOAuth  Method = "oauth"
+	MethodBasic  Method = "basic"
+	MethodBearer Method = "bearer"
+	MethodCustom Method = "custom"
 )
 
 // Credentials holds authentication credentials
@@ -50,7 +50,7 @@ func NewAuthenticator(method string, credentials Credentials) (Authenticator, er
 type APIKeyAuthenticator struct {
 	APIKey string
 	Email  string // Some providers use email + API key
-	Header string  // Header name (e.g., "X-API-Key", "Authorization")
+	Header string // Header name (e.g., "X-API-Key", "Authorization")
 }
 
 // NewAPIKeyAuthenticator creates an API key authenticator
@@ -240,4 +240,3 @@ func getStringValue(value interface{}, defaultValue string) string {
 	}
 	return defaultValue
 }
-
