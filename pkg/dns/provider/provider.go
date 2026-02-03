@@ -62,7 +62,7 @@ type FieldMappings struct {
 		Address    string `yaml:"address,omitempty"`     // e.g., "value" or "content"
 		TTL        string `yaml:"ttl,omitempty"`
 		MXPref     string `yaml:"mx_pref,omitempty"` // e.g., "priority" or "preference"
-		ID         string `yaml:"id,omitempty"`     // provider record ID field
+		ID         string `yaml:"id,omitempty"`      // provider record ID field
 	} `yaml:"request,omitempty"`
 
 	// Response mappings (provider format -> our format)
@@ -72,7 +72,7 @@ type FieldMappings struct {
 		Address    string `yaml:"address,omitempty"`
 		TTL        string `yaml:"ttl,omitempty"`
 		MXPref     string `yaml:"mx_pref,omitempty"`
-		ID         string `yaml:"id,omitempty"`     // provider record ID field
+		ID         string `yaml:"id,omitempty"` // provider record ID field
 	} `yaml:"response,omitempty"`
 
 	// List response structure (for REST providers)
