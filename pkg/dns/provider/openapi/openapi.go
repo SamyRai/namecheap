@@ -7,8 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gopkg.in/yaml.v3"
 	dnsprovider "zonekit/pkg/dns/provider"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Spec represents a parsed OpenAPI specification
@@ -294,6 +295,9 @@ func (s *Spec) extractMappings() *dnsprovider.FieldMappings {
 			case "priority", "preference", "mxpref", "mx_pref":
 				mappings.Request.MXPref = propName
 				mappings.Response.MXPref = propName
+			case "id", "recordid", "record_id", "_id":
+				mappings.Request.ID = propName
+				mappings.Response.ID = propName
 			}
 		}
 

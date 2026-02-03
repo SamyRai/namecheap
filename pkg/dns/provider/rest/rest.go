@@ -165,13 +165,15 @@ func (p *RESTProvider) deleteRecord(ctx context.Context, domainName string, reco
 		endpoint = strings.ReplaceAll(endpoint, "{zone_id}", zoneID)
 	}
 
-	// Replace {record_id} placeholder - this would need to be stored or retrieved
-	// For now, this is a limitation - some APIs require record ID for deletion
-	// This should be handled by the specific provider implementation
-	if strings.Contains(endpoint, "{record_id}") {
-		// Would need to get record ID from GetRecords response
-		// For now, return error indicating this needs provider-specific handling
-		return fmt.Errorf("delete_record requires record_id - needs provider-specific implementation")
+	// Replace {record_id} or {id} placeholders with the record's ID if provided
+	if strings.Contains(endpoint, "{record_id}") || strings.Contains(endpoint, "{id}") || strings.Contains(endpoint, "{recordId}") {
+		// Prefer record.ID
+		if record.ID == "" {
+			return fmt.Errorf("delete_record requires record_id - record is missing ID")
+		}
+		endpoint = strings.ReplaceAll(endpoint, "{record_id}", record.ID)
+		endpoint = strings.ReplaceAll(endpoint, "{id}", record.ID)
+		endpoint = strings.ReplaceAll(endpoint, "{recordId}", record.ID)
 	}
 
 	resp, err := p.client.Delete(ctx, endpoint)

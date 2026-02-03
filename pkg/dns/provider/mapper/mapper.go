@@ -22,6 +22,7 @@ type FieldMapping struct {
 	Address    string
 	TTL        string
 	MXPref     string
+	ID         string
 }
 
 // DefaultMappings returns default mappings (no transformation needed)
@@ -33,6 +34,7 @@ func DefaultMappings() Mappings {
 			Address:    "address",
 			TTL:        "ttl",
 			MXPref:     "mx_pref",
+			ID:         "",
 		},
 		Response: FieldMapping{
 			HostName:   "hostname",
@@ -40,6 +42,7 @@ func DefaultMappings() Mappings {
 			Address:    "address",
 			TTL:        "ttl",
 			MXPref:     "mx_pref",
+			ID:         "",
 		},
 		ListPath: "records",
 	}
@@ -63,6 +66,9 @@ func ToProviderFormat(record dnsrecord.Record, mapping FieldMapping) map[string]
 	}
 	if mapping.MXPref != "" && record.MXPref > 0 {
 		result[mapping.MXPref] = record.MXPref
+	}
+	if mapping.ID != "" && record.ID != "" {
+		result[mapping.ID] = record.ID
 	}
 
 	return result
@@ -112,6 +118,9 @@ func FromProviderFormat(data map[string]interface{}, mapping FieldMapping) (dnsr
 	}
 	if mapping.MXPref != "" {
 		record.MXPref = getInt(mapping.MXPref)
+	}
+	if mapping.ID != "" {
+		record.ID = getString(mapping.ID)
 	}
 
 	return record, nil
