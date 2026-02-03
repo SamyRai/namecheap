@@ -48,3 +48,34 @@ func TestToProviderFormat_IncludesID(t *testing.T) {
 	require.Equal(t, "abc123", m["id"])
 	require.Equal(t, "www", m["hostname"])
 }
+
+func TestExtractZones(t *testing.T) {
+	data := map[string]interface{}{
+		"result": []interface{}{
+			map[string]interface{}{"id": "1", "name": "example.com"},
+			map[string]interface{}{"id": "2", "name": "example.org"},
+		},
+	}
+
+	zones, err := ExtractZones(data, "result")
+	require.NoError(t, err)
+	require.Len(t, zones, 2)
+	require.Equal(t, "1", zones[0]["id"])
+}
+
+func TestFromProviderZoneFormat(t *testing.T) {
+	data := map[string]interface{}{
+		"id":   "z1",
+		"name": "example.com",
+	}
+
+	mapping := Mappings{
+		ZoneID:   "id",
+		ZoneName: "name",
+	}
+
+	zone, err := FromProviderZoneFormat(data, mapping)
+	require.NoError(t, err)
+	require.Equal(t, "z1", zone.ID)
+	require.Equal(t, "example.com", zone.Name)
+}

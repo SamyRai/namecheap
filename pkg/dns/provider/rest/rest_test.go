@@ -28,16 +28,83 @@ func TestDeleteRecord_ByID_Success(t *testing.T) {
 	mappings := mapper.DefaultMappings()
 	p := NewRESTProvider("test", client, mappings, map[string]string{"delete_record": "/records/{record_id}"}, nil)
 
-	err := p.deleteRecord(context.Background(), "example.com", dnsrecord.Record{ID: "abc123"})
+	err := p.DeleteRecord(context.Background(), "example.com", "abc123")
 	require.NoError(t, err)
 }
 
-func TestDeleteRecord_MissingID_Error(t *testing.T) {
+func TestDeleteRecord_MissingEndpoint_Error(t *testing.T) {
 	client := httpclient.NewClient(httpclient.ClientConfig{BaseURL: "http://example.invalid"})
 	mappings := mapper.DefaultMappings()
-	p := NewRESTProvider("test", client, mappings, map[string]string{"delete_record": "/records/{record_id}"}, nil)
+	p := NewRESTProvider("test", client, mappings, map[string]string{}, nil)
 
-	err := p.deleteRecord(context.Background(), "example.com", dnsrecord.Record{})
+	err := p.DeleteRecord(context.Background(), "example.com", "abc123")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "requires record_id")
+	require.Contains(t, err.Error(), "delete_record endpoint not configured")
+}
+
+func TestListZones_StaticConfig(t *testing.T) {
+	client := httpclient.NewClient(httpclient.ClientConfig{BaseURL: "http://example.invalid"})
+	mappings := mapper.DefaultMappings()
+	settings := map[string]interface{}{"zone_id": "static-zone"}
+	p := NewRESTProvider("test", client, mappings, map[string]string{}, settings)
+
+	zones, err := p.ListZones(context.Background())
+	require.NoError(t, err)
+	require.Len(t, zones, 1)
+	require.Equal(t, "static-zone", zones[0].ID)
+}
+
+func TestListZones_Endpoint(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/zones" {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"zones": [{"id": "z1", "name": "example.com"}]}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	client := httpclient.NewClient(httpclient.ClientConfig{BaseURL: ts.URL})
+	mappings := mapper.DefaultMappings()
+	p := NewRESTProvider("test", client, mappings, map[string]string{"list_zones": "/zones"}, nil)
+
+	zones, err := p.ListZones(context.Background())
+	require.NoError(t, err)
+	require.Len(t, zones, 1)
+	require.Equal(t, "z1", zones[0].ID)
+	require.Equal(t, "example.com", zones[0].Name)
+}
+
+func TestCreateRecord_ReturnsID(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/zones/z1/records" {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"result": {"id": "new-rec-123", "name": "www", "type": "A", "content": "1.2.3.4"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	client := httpclient.NewClient(httpclient.ClientConfig{BaseURL: ts.URL})
+	mappings := mapper.DefaultMappings()
+	mappings.ResponsePath = "result" // Mock response structure
+	mappings.Response.ID = "id"
+	mappings.Response.HostName = "name"
+	mappings.Response.RecordType = "type"
+	mappings.Response.Address = "content"
+
+	p := NewRESTProvider("test", client, mappings, map[string]string{"create_record": "/zones/{zone_id}/records"}, nil)
+
+	rec := dnsrecord.Record{
+		HostName:   "www",
+		RecordType: "A",
+		Address:    "1.2.3.4",
+	}
+
+	created, err := p.CreateRecord(context.Background(), "z1", rec)
+	require.NoError(t, err)
+	require.Equal(t, "new-rec-123", created.ID)
+	require.Equal(t, "www", created.HostName)
 }

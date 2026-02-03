@@ -164,6 +164,12 @@ func (s *Spec) mapOperationToEndpoint(method, operationID, path string) string {
 		if strings.Contains(path, "record") || strings.Contains(path, "dns") {
 			return "get_records"
 		}
+		if strings.Contains(path, "zones") || strings.Contains(path, "domains") {
+			if strings.Contains(operationID, "list") {
+				return "list_zones"
+			}
+			return "get_zone"
+		}
 	}
 	if strings.Contains(operationID, "create") || strings.Contains(operationID, "add") {
 		if strings.Contains(path, "record") || strings.Contains(path, "dns") {
@@ -186,6 +192,12 @@ func (s *Spec) mapOperationToEndpoint(method, operationID, path string) string {
 	case "get":
 		if strings.Contains(path, "record") || strings.Contains(path, "dns") {
 			return "get_records"
+		}
+		if (strings.Contains(path, "zones") || strings.Contains(path, "domains")) && !strings.Contains(path, "{") {
+			return "list_zones"
+		}
+		if strings.Contains(path, "zones") || strings.Contains(path, "domains") {
+			return "get_zone"
 		}
 	case "post":
 		if strings.Contains(path, "record") || strings.Contains(path, "dns") {
@@ -272,78 +284,151 @@ func (s *Spec) extractMappings() *dnsprovider.FieldMappings {
 	for schemaName, schema := range s.Components.Schemas {
 		origName := schemaName
 		schemaName = strings.ToLower(schemaName)
-		if !strings.Contains(schemaName, "record") && !strings.Contains(schemaName, "dns") {
-			continue
+
+		// Check for Record schema
+		if strings.Contains(schemaName, "record") && !strings.Contains(schemaName, "zone") {
+			s.mapRecordSchema(schema, mappings, origName)
 		}
 
-		schemaMap, ok := schema.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		properties, ok := schemaMap["properties"].(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		// Map common DNS record fields
-		for propName := range properties {
-			propLower := strings.ToLower(propName)
-			switch propLower {
-			case "name", "hostname", "host":
-				mappings.Request.HostName = propName
-				mappings.Response.HostName = propName
-			case "type", "recordtype", "record_type":
-				mappings.Request.RecordType = propName
-				mappings.Response.RecordType = propName
-			case "content", "data", "value", "address":
-				mappings.Request.Address = propName
-				mappings.Response.Address = propName
-			case "ttl":
-				mappings.Request.TTL = propName
-				mappings.Response.TTL = propName
-			case "priority", "preference", "mxpref", "mx_pref":
-				mappings.Request.MXPref = propName
-				mappings.Response.MXPref = propName
-			case "id", "recordid", "record_id", "_id":
-				mappings.Request.ID = propName
-				mappings.Response.ID = propName
-			}
-		}
-
-		// Try to find list path by inspecting other schemas for arrays of this schema
-		for _, otherSchema := range s.Components.Schemas {
-			otherSchemaMap, ok := otherSchema.(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			// Look for properties that are arrays with items referencing this schema
-			if props, ok := otherSchemaMap["properties"].(map[string]interface{}); ok {
-				for propName, prop := range props {
-					propMap, ok := prop.(map[string]interface{})
-					if !ok {
-						continue
-					}
-
-					if propMap["type"] == "array" {
-						if items, ok := propMap["items"].(map[string]interface{}); ok {
-							if ref, ok := items["$ref"].(string); ok {
-								refLower := strings.ToLower(ref)
-								if strings.Contains(refLower, strings.ToLower(origName)) || strings.HasSuffix(refLower, "/"+strings.ToLower(origName)) {
-									mappings.ListPath = propName
-									break
-								}
-							}
-						}
-					}
-				}
-			}
-			if mappings.ListPath != "" {
-				break
+		// Check for Zone schema
+		if strings.Contains(schemaName, "zone") || strings.Contains(schemaName, "domain") {
+			if !strings.Contains(schemaName, "record") {
+				s.mapZoneSchema(schema, mappings, origName)
 			}
 		}
 	}
 
 	return mappings
+}
+
+func (s *Spec) mapRecordSchema(schema interface{}, mappings *dnsprovider.FieldMappings, origName string) {
+	schemaMap, ok := schema.(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	properties, ok := schemaMap["properties"].(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	// Map common DNS record fields
+	for propName := range properties {
+		propLower := strings.ToLower(propName)
+		switch propLower {
+		case "name", "hostname", "host":
+			mappings.Request.HostName = propName
+			mappings.Response.HostName = propName
+		case "type", "recordtype", "record_type":
+			mappings.Request.RecordType = propName
+			mappings.Response.RecordType = propName
+		case "content", "data", "value", "address":
+			mappings.Request.Address = propName
+			mappings.Response.Address = propName
+		case "ttl":
+			mappings.Request.TTL = propName
+			mappings.Response.TTL = propName
+		case "priority", "preference", "mxpref", "mx_pref":
+			mappings.Request.MXPref = propName
+			mappings.Response.MXPref = propName
+		case "id", "recordid", "record_id", "_id":
+			mappings.Request.ID = propName
+			mappings.Response.ID = propName
+		}
+	}
+
+	// Try to find list path
+	if mappings.ListPath == "" {
+		mappings.ListPath = s.findListPath(origName)
+	}
+
+	// Try to find response path
+	if mappings.ResponsePath == "" {
+		mappings.ResponsePath = s.findResponsePath(origName)
+	}
+}
+
+func (s *Spec) mapZoneSchema(schema interface{}, mappings *dnsprovider.FieldMappings, origName string) {
+	schemaMap, ok := schema.(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	properties, ok := schemaMap["properties"].(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	// Map common Zone fields
+	for propName := range properties {
+		propLower := strings.ToLower(propName)
+		switch propLower {
+		case "name", "domain", "zonename", "zone_name":
+			mappings.ZoneName = propName
+		case "id", "zoneid", "zone_id", "_id":
+			mappings.ZoneID = propName
+		}
+	}
+
+	// Try to find list path by inspecting other schemas
+	if mappings.ZoneListPath == "" {
+		mappings.ZoneListPath = s.findListPath(origName)
+	}
+}
+
+func (s *Spec) findListPath(targetSchemaName string) string {
+	for _, otherSchema := range s.Components.Schemas {
+		otherSchemaMap, ok := otherSchema.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		if props, ok := otherSchemaMap["properties"].(map[string]interface{}); ok {
+			for propName, prop := range props {
+				propMap, ok := prop.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				if propMap["type"] == "array" {
+					if items, ok := propMap["items"].(map[string]interface{}); ok {
+						if ref, ok := items["$ref"].(string); ok {
+							refLower := strings.ToLower(ref)
+							if strings.Contains(refLower, strings.ToLower(targetSchemaName)) || strings.HasSuffix(refLower, "/"+targetSchemaName) {
+								return propName
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func (s *Spec) findResponsePath(targetSchemaName string) string {
+	for _, otherSchema := range s.Components.Schemas {
+		otherSchemaMap, ok := otherSchema.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		if props, ok := otherSchemaMap["properties"].(map[string]interface{}); ok {
+			for propName, prop := range props {
+				propMap, ok := prop.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				// Look for property that is the target object directly (not array)
+				if ref, ok := propMap["$ref"].(string); ok {
+					refLower := strings.ToLower(ref)
+					if strings.Contains(refLower, strings.ToLower(targetSchemaName)) || strings.HasSuffix(refLower, "/"+targetSchemaName) {
+						return propName
+					}
+				}
+			}
+		}
+	}
+	return ""
 }

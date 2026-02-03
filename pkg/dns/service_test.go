@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -30,19 +31,50 @@ func (m *mockProvider) Name() string {
 	return m.name
 }
 
-func (m *mockProvider) GetRecords(domainName string) ([]dnsrecord.Record, error) {
+func (m *mockProvider) ListZones(ctx context.Context) ([]provider.Zone, error) {
+	return nil, nil
+}
+
+func (m *mockProvider) GetZone(ctx context.Context, zoneID string) (provider.Zone, error) {
+	return provider.Zone{}, nil
+}
+
+func (m *mockProvider) ListRecords(ctx context.Context, zoneID string) ([]dnsrecord.Record, error) {
 	if m.getRecordsError != nil {
 		return nil, m.getRecordsError
 	}
-	return m.records[domainName], nil
+	return m.records[zoneID], nil
 }
 
-func (m *mockProvider) SetRecords(domainName string, records []dnsrecord.Record) error {
+func (m *mockProvider) CreateRecord(ctx context.Context, zoneID string, record dnsrecord.Record) (dnsrecord.Record, error) {
+	return dnsrecord.Record{}, nil
+}
+
+func (m *mockProvider) UpdateRecord(ctx context.Context, zoneID string, recordID string, record dnsrecord.Record) (dnsrecord.Record, error) {
+	return dnsrecord.Record{}, nil
+}
+
+func (m *mockProvider) DeleteRecord(ctx context.Context, zoneID string, recordID string) error {
+	return nil
+}
+
+func (m *mockProvider) BulkReplaceRecords(ctx context.Context, zoneID string, records []dnsrecord.Record) error {
 	if m.setRecordsError != nil {
 		return m.setRecordsError
 	}
-	m.records[domainName] = records
+	m.records[zoneID] = records
 	return nil
+}
+
+func (m *mockProvider) Capabilities() provider.ProviderCapabilities {
+	return provider.ProviderCapabilities{
+		CanListZones:    false,
+		CanGetZone:      false,
+		CanCreateRecord: false,
+		CanUpdateRecord: false,
+		CanDeleteRecord: false,
+		CanBulkReplace:  true,
+	}
 }
 
 func (m *mockProvider) Validate() error {
