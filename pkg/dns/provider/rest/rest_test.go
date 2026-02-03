@@ -8,7 +8,6 @@ import (
 
 	httpclient "zonekit/pkg/dns/provider/http"
 	"zonekit/pkg/dns/provider/mapper"
-	"zonekit/pkg/dnsrecord"
 
 	"github.com/stretchr/testify/require"
 )
@@ -28,16 +27,16 @@ func TestDeleteRecord_ByID_Success(t *testing.T) {
 	mappings := mapper.DefaultMappings()
 	p := NewRESTProvider("test", client, mappings, map[string]string{"delete_record": "/records/{record_id}"}, nil)
 
-	err := p.deleteRecord(context.Background(), "example.com", dnsrecord.Record{ID: "abc123"})
+	err := p.DeleteRecord(context.Background(), "example.com", "abc123")
 	require.NoError(t, err)
 }
 
-func TestDeleteRecord_MissingID_Error(t *testing.T) {
+func TestDeleteRecord_MissingEndpoint_Error(t *testing.T) {
 	client := httpclient.NewClient(httpclient.ClientConfig{BaseURL: "http://example.invalid"})
 	mappings := mapper.DefaultMappings()
-	p := NewRESTProvider("test", client, mappings, map[string]string{"delete_record": "/records/{record_id}"}, nil)
+	p := NewRESTProvider("test", client, mappings, map[string]string{}, nil)
 
-	err := p.deleteRecord(context.Background(), "example.com", dnsrecord.Record{})
+	err := p.DeleteRecord(context.Background(), "example.com", "abc123")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "requires record_id")
+	require.Contains(t, err.Error(), "delete_record endpoint not configured")
 }

@@ -1,19 +1,55 @@
 package provider
 
 import (
+	"context"
+
 	"zonekit/pkg/dnsrecord"
 )
+
+// Zone represents a DNS zone
+type Zone struct {
+	ID   string
+	Name string
+}
+
+// ProviderCapabilities describes what a provider supports
+type ProviderCapabilities struct {
+	CanListZones    bool
+	CanGetZone      bool
+	CanCreateRecord bool
+	CanUpdateRecord bool
+	CanDeleteRecord bool
+	CanBulkReplace  bool
+}
 
 // Provider defines the interface that all DNS providers must implement
 type Provider interface {
 	// Name returns the provider name (e.g., "namecheap", "cloudflare", "godaddy")
 	Name() string
 
-	// GetRecords retrieves all DNS records for a domain
-	GetRecords(domainName string) ([]dnsrecord.Record, error)
+	// ListZones retrieves all zones managed by the provider
+	ListZones(ctx context.Context) ([]Zone, error)
 
-	// SetRecords sets DNS records for a domain (replaces all existing records)
-	SetRecords(domainName string, records []dnsrecord.Record) error
+	// GetZone retrieves a specific zone by ID
+	GetZone(ctx context.Context, zoneID string) (Zone, error)
+
+	// ListRecords retrieves all DNS records for a zone
+	ListRecords(ctx context.Context, zoneID string) ([]dnsrecord.Record, error)
+
+	// CreateRecord creates a new DNS record
+	CreateRecord(ctx context.Context, zoneID string, record dnsrecord.Record) (dnsrecord.Record, error)
+
+	// UpdateRecord updates an existing DNS record
+	UpdateRecord(ctx context.Context, zoneID string, recordID string, record dnsrecord.Record) (dnsrecord.Record, error)
+
+	// DeleteRecord deletes a DNS record
+	DeleteRecord(ctx context.Context, zoneID string, recordID string) error
+
+	// BulkReplaceRecords replaces all records in a zone with the provided set
+	BulkReplaceRecords(ctx context.Context, zoneID string, records []dnsrecord.Record) error
+
+	// Capabilities returns the provider's capabilities
+	Capabilities() ProviderCapabilities
 
 	// Validate checks if the provider is properly configured
 	Validate() error
@@ -63,6 +99,10 @@ type FieldMappings struct {
 		TTL        string `yaml:"ttl,omitempty"`
 		MXPref     string `yaml:"mx_pref,omitempty"` // e.g., "priority" or "preference"
 		ID         string `yaml:"id,omitempty"`      // provider record ID field
+		Priority   string `yaml:"priority,omitempty"`
+		Weight     string `yaml:"weight,omitempty"`
+		Port       string `yaml:"port,omitempty"`
+		Target     string `yaml:"target,omitempty"`
 	} `yaml:"request,omitempty"`
 
 	// Response mappings (provider format -> our format)
@@ -73,6 +113,10 @@ type FieldMappings struct {
 		TTL        string `yaml:"ttl,omitempty"`
 		MXPref     string `yaml:"mx_pref,omitempty"`
 		ID         string `yaml:"id,omitempty"` // provider record ID field
+		Priority   string `yaml:"priority,omitempty"`
+		Weight     string `yaml:"weight,omitempty"`
+		Port       string `yaml:"port,omitempty"`
+		Target     string `yaml:"target,omitempty"`
 	} `yaml:"response,omitempty"`
 
 	// List response structure (for REST providers)

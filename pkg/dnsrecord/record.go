@@ -8,6 +8,12 @@ type Record struct {
 	Address    string
 	TTL        int
 	MXPref     int
+	Priority   int
+	Weight     int
+	Port       int
+	Target     string
+	Metadata   map[string]string
+	Raw        interface{}
 }
 
 // RecordType constants
