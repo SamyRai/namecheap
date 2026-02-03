@@ -121,6 +121,12 @@ func buildMappings(configMappings *dnsprovider.FieldMappings) mapper.Mappings {
 		m.Request.MXPref = "mx_pref"
 	}
 
+	if configMappings.Request.ID != "" {
+		m.Request.ID = configMappings.Request.ID
+	} else {
+		m.Request.ID = ""
+	}
+
 	// Response mappings
 	if configMappings.Response.HostName != "" {
 		m.Response.HostName = configMappings.Response.HostName
@@ -150,6 +156,12 @@ func buildMappings(configMappings *dnsprovider.FieldMappings) mapper.Mappings {
 		m.Response.MXPref = configMappings.Response.MXPref
 	} else {
 		m.Response.MXPref = "mx_pref"
+	}
+
+	if configMappings.Response.ID != "" {
+		m.Response.ID = configMappings.Response.ID
+	} else {
+		m.Response.ID = ""
 	}
 
 	return m

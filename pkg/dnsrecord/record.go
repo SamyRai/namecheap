@@ -2,6 +2,7 @@ package dnsrecord
 
 // Record represents a DNS record
 type Record struct {
+	ID         string
 	HostName   string
 	RecordType string
 	Address    string
