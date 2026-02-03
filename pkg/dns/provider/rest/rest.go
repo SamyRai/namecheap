@@ -207,15 +207,94 @@ func (p *RESTProvider) replacePlaceholders(endpoint, domainName string) string {
 }
 
 func (p *RESTProvider) getZoneID(domainName string) (string, error) {
-	// Check if zone_id is in settings
+	// 1. Check if zone_id is in settings
 	if zoneID, ok := p.settings["zone_id"].(string); ok && zoneID != "" {
 		return zoneID, nil
 	}
 
-	// Some providers require zone_id to be fetched
-	// This would need provider-specific implementation
-	// For now, return empty if not in settings
+	// 2. Try configured endpoints that may list or get zones
+	candidates := []string{"get_zone", "get_zone_by_name", "list_zones", "zones", "search_zones"}
+	for _, key := range candidates {
+		if path, ok := p.endpoints[key]; ok && path != "" {
+			// Replace placeholders
+			endpoint := p.replacePlaceholders(path, domainName)
+
+			ctx := context.Background()
+			// If endpoint does not include domain placeholder, try passing domain as query param 'name'
+			query := map[string]string{}
+			if !strings.Contains(endpoint, "{domain}") {
+				query["name"] = domainName
+			}
+
+			resp, err := p.client.Get(ctx, endpoint, query)
+			if err != nil {
+				// Try next candidate
+				continue
+			}
+
+			var data interface{}
+			if err := httpprovider.ParseJSONResponse(resp, &data); err != nil {
+				continue
+			}
+
+			// Search for matching zone object
+			// Check for object with 'result' array (Cloudflare style)
+			if m, ok := data.(map[string]interface{}); ok {
+				// Search arrays at top level
+				for _, v := range m {
+					switch arr := v.(type) {
+					case []interface{}:
+						for _, item := range arr {
+							if id := extractIDForDomain(item, domainName); id != "" {
+								return id, nil
+							}
+						}
+					case map[string]interface{}:
+						if id := extractIDForDomain(arr, domainName); id != "" {
+							return id, nil
+						}
+					}
+				}
+			}
+			// As fallback, try top-level array
+			if arr, ok := data.([]interface{}); ok {
+				for _, item := range arr {
+					if id := extractIDForDomain(item, domainName); id != "" {
+						return id, nil
+					}
+				}
+			}
+		}
+	}
+
+	// 3. Not found
 	return "", nil
+}
+
+// extractIDForDomain tries to extract an 'id' field from an object if it matches the provided domain name
+func extractIDForDomain(item interface{}, domainName string) string {
+	obj, ok := item.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	// Check common name fields
+	nameCandidates := []string{"name", "zone", "domain", "zone_name"}
+	for _, nc := range nameCandidates {
+		if v, ok := obj[nc]; ok {
+			if vs, ok := v.(string); ok && strings.EqualFold(strings.TrimSuffix(vs, "."), domainName) {
+				// Found matching name; extract id
+				for _, idc := range []string{"id", "zone_id", "dns_record_id"} {
+					if idv, ok := obj[idc]; ok {
+						return fmt.Sprintf("%v", idv)
+					}
+				}
+			}
+		}
+	}
+
+	// Only return an ID if it was found alongside a matching name; otherwise, no match
+	return ""
 }
 
 // Ensure RESTProvider implements Provider interface
