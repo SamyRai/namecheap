@@ -34,6 +34,9 @@ func TestCloudflareSpec_ToProviderConfig(t *testing.T) {
 	// List path should be detected
 	require.Equal(t, "result", cfg.Mappings.ListPath)
 
+	// Response path should be detected
+	require.Equal(t, "result", cfg.Mappings.ResponsePath)
+
 	// Zone mappings
 	require.Equal(t, "id", cfg.Mappings.ZoneID)
 	require.Equal(t, "name", cfg.Mappings.ZoneName)

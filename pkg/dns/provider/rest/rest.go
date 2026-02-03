@@ -213,10 +213,24 @@ func (p *RESTProvider) CreateRecord(ctx context.Context, zoneID string, record d
 	if err != nil {
 		return dnsrecord.Record{}, errors.NewAPI("CreateRecord", "failed to create DNS record", err)
 	}
-	defer resp.Body.Close()
 
-	// TODO: Parse response to get ID
-	return record, nil
+	// Parse response to get ID and other server-assigned fields
+	var responseData interface{}
+	if err := httpprovider.ParseJSONResponse(resp, &responseData); err != nil {
+		return dnsrecord.Record{}, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	recordMap, err := mapper.ExtractRecord(responseData, p.mappings.ResponsePath)
+	if err != nil {
+		return dnsrecord.Record{}, fmt.Errorf("failed to extract record from response: %w", err)
+	}
+
+	createdRecord, err := mapper.FromProviderFormat(recordMap, p.mappings.Response)
+	if err != nil {
+		return dnsrecord.Record{}, fmt.Errorf("failed to convert record from response: %w", err)
+	}
+
+	return createdRecord, nil
 }
 
 // UpdateRecord updates an existing DNS record
@@ -237,9 +251,24 @@ func (p *RESTProvider) UpdateRecord(ctx context.Context, zoneID string, recordID
 	if err != nil {
 		return dnsrecord.Record{}, errors.NewAPI("UpdateRecord", "failed to update DNS record", err)
 	}
-	defer resp.Body.Close()
 
-	return record, nil
+	// Parse response to get updated fields
+	var responseData interface{}
+	if err := httpprovider.ParseJSONResponse(resp, &responseData); err != nil {
+		return dnsrecord.Record{}, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	recordMap, err := mapper.ExtractRecord(responseData, p.mappings.ResponsePath)
+	if err != nil {
+		return dnsrecord.Record{}, fmt.Errorf("failed to extract record from response: %w", err)
+	}
+
+	updatedRecord, err := mapper.FromProviderFormat(recordMap, p.mappings.Response)
+	if err != nil {
+		return dnsrecord.Record{}, fmt.Errorf("failed to convert record from response: %w", err)
+	}
+
+	return updatedRecord, nil
 }
 
 // DeleteRecord deletes a DNS record
@@ -266,6 +295,10 @@ func (p *RESTProvider) DeleteRecord(ctx context.Context, zoneID string, recordID
 // BulkReplaceRecords replaces all records in a zone with the provided set
 func (p *RESTProvider) BulkReplaceRecords(ctx context.Context, zoneID string, records []dnsrecord.Record) error {
 	// Naive implementation
+	if !p.Capabilities().CanDeleteRecord || !p.Capabilities().CanCreateRecord {
+		return fmt.Errorf("provider does not support bulk replace (missing delete_record or create_record capability)")
+	}
+
 	existing, err := p.ListRecords(ctx, zoneID)
 	if err != nil {
 		return err
@@ -273,14 +306,16 @@ func (p *RESTProvider) BulkReplaceRecords(ctx context.Context, zoneID string, re
 
 	for _, r := range existing {
 		if r.ID != "" {
-			_ = p.DeleteRecord(ctx, zoneID, r.ID)
+			if err := p.DeleteRecord(ctx, zoneID, r.ID); err != nil {
+				return fmt.Errorf("failed to delete record %s during bulk replace: %w", r.ID, err)
+			}
 		}
 	}
 
 	for _, r := range records {
 		_, err := p.CreateRecord(ctx, zoneID, r)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create record %s during bulk replace: %w", r.HostName, err)
 		}
 	}
 	return nil
@@ -288,13 +323,17 @@ func (p *RESTProvider) BulkReplaceRecords(ctx context.Context, zoneID string, re
 
 // Capabilities returns the provider's capabilities
 func (p *RESTProvider) Capabilities() dnsprovider.ProviderCapabilities {
+	canDelete := p.hasEndpoint("delete_record")
+	canCreate := p.hasEndpoint("create_record")
+
 	return dnsprovider.ProviderCapabilities{
 		CanListZones:    p.hasEndpoint("list_zones") || p.hasEndpoint("zones") || p.hasSetting("zone_id"),
 		CanGetZone:      true,
-		CanCreateRecord: p.hasEndpoint("create_record"),
+		CanCreateRecord: canCreate,
 		CanUpdateRecord: p.hasEndpoint("update_record"),
-		CanDeleteRecord: p.hasEndpoint("delete_record"),
-		CanBulkReplace:  true,
+		CanDeleteRecord: canDelete,
+		// Naive bulk replace requires delete and create
+		CanBulkReplace:  canDelete && canCreate,
 	}
 }
 

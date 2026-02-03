@@ -88,6 +88,7 @@ func buildMappings(configMappings *dnsprovider.FieldMappings) mapper.Mappings {
 
 	m := mapper.Mappings{
 		ListPath:     configMappings.ListPath,
+		ResponsePath: configMappings.ResponsePath,
 		ZoneListPath: configMappings.ZoneListPath,
 		ZoneID:       configMappings.ZoneID,
 		ZoneName:     configMappings.ZoneName,

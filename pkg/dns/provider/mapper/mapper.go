@@ -14,6 +14,7 @@ type Mappings struct {
 	Request  FieldMapping
 	Response FieldMapping
 	ListPath string // JSON path to records array (e.g., "result" or "data.records")
+	ResponsePath string // JSON path to single record response (e.g., "result" or "domain_record")
 
 	// Zone Mappings
 	ZoneListPath string // JSON path to zones array
@@ -50,7 +51,8 @@ func DefaultMappings() Mappings {
 			MXPref:     "mx_pref",
 			ID:         "",
 		},
-		ListPath: "records",
+		ListPath:     "records",
+		ResponsePath: "", // Default: root object
 		ZoneListPath: "zones",
 		ZoneID:       "id",
 		ZoneName:     "name",
@@ -140,6 +142,11 @@ func ExtractRecords(data interface{}, listPath string) ([]map[string]interface{}
 	return extractList(data, listPath)
 }
 
+// ExtractRecord extracts a single record from a JSON response using the response path
+func ExtractRecord(data interface{}, responsePath string) (map[string]interface{}, error) {
+	return extractObject(data, responsePath)
+}
+
 // ExtractZones extracts zones from a JSON response using the list path
 func ExtractZones(data interface{}, listPath string) ([]map[string]interface{}, error) {
 	return extractList(data, listPath)
@@ -184,8 +191,43 @@ func extractList(data interface{}, listPath string) ([]map[string]interface{}, e
 		return nil, fmt.Errorf("no list path specified and data is not an array")
 	}
 
-	// Navigate through the path (e.g., "result" or "data.records")
-	parts := strings.Split(listPath, ".")
+	val, err := navigatePath(data, listPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if arr, ok := val.([]interface{}); ok {
+		return convertArrayToMaps(arr)
+	}
+
+	return nil, fmt.Errorf("path '%s' does not point to an array (got %T)", listPath, val)
+}
+
+// extractObject is a helper to extract a single map from a JSON response
+func extractObject(data interface{}, path string) (map[string]interface{}, error) {
+	if path == "" {
+		// Default: assume data is the object
+		if m, ok := data.(map[string]interface{}); ok {
+			return m, nil
+		}
+		return nil, fmt.Errorf("no path specified and data is not a map")
+	}
+
+	val, err := navigatePath(data, path)
+	if err != nil {
+		return nil, err
+	}
+
+	if m, ok := val.(map[string]interface{}); ok {
+		return m, nil
+	}
+
+	return nil, fmt.Errorf("path '%s' does not point to a map (got %T)", path, val)
+}
+
+// navigatePath traverses the JSON structure
+func navigatePath(data interface{}, path string) (interface{}, error) {
+	parts := strings.Split(path, ".")
 	current := reflect.ValueOf(data)
 
 	for _, part := range parts {
@@ -193,36 +235,35 @@ func extractList(data interface{}, listPath string) ([]map[string]interface{}, e
 			current = current.Elem()
 		}
 
+		// Check if valid after dereferencing interface or nil pointer
+		if !current.IsValid() {
+			return nil, fmt.Errorf("path '%s' contains nil value", path)
+		}
+
 		switch current.Kind() {
 		case reflect.Map:
 			key := reflect.ValueOf(part)
 			current = current.MapIndex(key)
 			if !current.IsValid() {
-				return nil, fmt.Errorf("path '%s' not found in response", listPath)
+				return nil, fmt.Errorf("path '%s' not found in response", path)
 			}
 		case reflect.Slice, reflect.Array:
-			// If we hit an array/slice, we're done navigating
-			break
+			return nil, fmt.Errorf("cannot navigate through array at '%s'", part)
 		default:
-			return nil, fmt.Errorf("invalid path '%s': cannot navigate through %v", listPath, current.Kind())
+			return nil, fmt.Errorf("invalid path '%s': cannot navigate through %v", path, current.Kind())
 		}
 	}
 
-	// Convert to array of maps
 	if current.Kind() == reflect.Interface {
 		current = current.Elem()
 	}
 
-	if current.Kind() != reflect.Slice && current.Kind() != reflect.Array {
-		return nil, fmt.Errorf("path '%s' does not point to an array", listPath)
+	// Check validity again
+	if !current.IsValid() {
+		return nil, nil // Valid nil result
 	}
 
-	arr := make([]interface{}, current.Len())
-	for i := 0; i < current.Len(); i++ {
-		arr[i] = current.Index(i).Interface()
-	}
-
-	return convertArrayToMaps(arr)
+	return current.Interface(), nil
 }
 
 // convertArrayToMaps converts an array of interfaces to array of maps

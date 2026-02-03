@@ -337,9 +337,14 @@ func (s *Spec) mapRecordSchema(schema interface{}, mappings *dnsprovider.FieldMa
 		}
 	}
 
-	// Try to find list path by inspecting other schemas
+	// Try to find list path
 	if mappings.ListPath == "" {
 		mappings.ListPath = s.findListPath(origName)
+	}
+
+	// Try to find response path
+	if mappings.ResponsePath == "" {
+		mappings.ResponsePath = s.findResponsePath(origName)
 	}
 }
 
@@ -393,6 +398,33 @@ func (s *Spec) findListPath(targetSchemaName string) string {
 								return propName
 							}
 						}
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func (s *Spec) findResponsePath(targetSchemaName string) string {
+	for _, otherSchema := range s.Components.Schemas {
+		otherSchemaMap, ok := otherSchema.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		if props, ok := otherSchemaMap["properties"].(map[string]interface{}); ok {
+			for propName, prop := range props {
+				propMap, ok := prop.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				// Look for property that is the target object directly (not array)
+				if ref, ok := propMap["$ref"].(string); ok {
+					refLower := strings.ToLower(ref)
+					if strings.Contains(refLower, strings.ToLower(targetSchemaName)) || strings.HasSuffix(refLower, "/"+targetSchemaName) {
+						return propName
 					}
 				}
 			}

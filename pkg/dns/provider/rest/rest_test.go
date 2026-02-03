@@ -8,6 +8,7 @@ import (
 
 	httpclient "zonekit/pkg/dns/provider/http"
 	"zonekit/pkg/dns/provider/mapper"
+	"zonekit/pkg/dnsrecord"
 
 	"github.com/stretchr/testify/require"
 )
@@ -73,4 +74,37 @@ func TestListZones_Endpoint(t *testing.T) {
 	require.Len(t, zones, 1)
 	require.Equal(t, "z1", zones[0].ID)
 	require.Equal(t, "example.com", zones[0].Name)
+}
+
+func TestCreateRecord_ReturnsID(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/zones/z1/records" {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"result": {"id": "new-rec-123", "name": "www", "type": "A", "content": "1.2.3.4"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	client := httpclient.NewClient(httpclient.ClientConfig{BaseURL: ts.URL})
+	mappings := mapper.DefaultMappings()
+	mappings.ResponsePath = "result" // Mock response structure
+	mappings.Response.ID = "id"
+	mappings.Response.HostName = "name"
+	mappings.Response.RecordType = "type"
+	mappings.Response.Address = "content"
+
+	p := NewRESTProvider("test", client, mappings, map[string]string{"create_record": "/zones/{zone_id}/records"}, nil)
+
+	rec := dnsrecord.Record{
+		HostName:   "www",
+		RecordType: "A",
+		Address:    "1.2.3.4",
+	}
+
+	created, err := p.CreateRecord(context.Background(), "z1", rec)
+	require.NoError(t, err)
+	require.Equal(t, "new-rec-123", created.ID)
+	require.Equal(t, "www", created.HostName)
 }
