@@ -15,7 +15,7 @@ func FindProjectConfigPath() string {
 
 	// Look for config in current directory and parent directories
 	for {
-		configPath := filepath.Join(cwd, "configs", ".namecheap-dns.yaml")
+		configPath := filepath.Join(cwd, "configs", ".zonekit.yaml")
 		if _, err := os.Stat(configPath); err == nil {
 			return configPath
 		}
@@ -30,4 +30,3 @@ func FindProjectConfigPath() string {
 
 	return ""
 }
-

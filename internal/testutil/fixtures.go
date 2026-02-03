@@ -74,4 +74,3 @@ func ValidDomainFixture() string {
 func ValidSubdomainFixture() string {
 	return "www.example.com"
 }
-

@@ -1,0 +1,54 @@
+name: google-workspace
+display_name: Google Workspace
+description: Google Workspace (Gmail) email hosting setup
+category: email
+
+records:
+  mx:
+    - hostname: "@"
+      server: aspmx.l.google.com
+      priority: 1
+    - hostname: "@"
+      server: alt1.aspmx.l.google.com
+      priority: 5
+    - hostname: "@"
+      server: alt2.aspmx.l.google.com
+      priority: 5
+    - hostname: "@"
+      server: alt3.aspmx.l.google.com
+      priority: 10
+    - hostname: "@"
+      server: alt4.aspmx.l.google.com
+      priority: 10
+
+  spf:
+    hostname: "@"
+    value: "v=spf1 include:_spf.google.com ~all"
+
+  dkim:
+    - hostname: google._domainkey
+      type: TXT
+      value: "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC8kGa1Gy2h1F4T5Nd1g..."
+
+  dmarc:
+    hostname: "_dmarc"
+    value: "v=DMARC1; p=none; rua=mailto:dmarc@{domain}"
+
+  autodiscover:
+    type: SRV
+    hostname: "@"
+    service: "_autodiscover._tcp"
+    target: autodiscover.google.com
+    port: 443
+    priority: 0
+    weight: 0
+
+verification:
+  required_records:
+    - type: MX
+      hostname: "@"
+      contains: aspmx.l.google.com
+    - type: TXT
+      hostname: "@"
+      contains: include:_spf.google.com
+

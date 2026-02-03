@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"gopkg.in/yaml.v3"
-	"namecheap-dns-manager/internal/testutil"
+	"zonekit/internal/testutil"
 )
 
 // ConfigTestSuite is a test suite for config package

@@ -5,10 +5,13 @@ import (
 	"os"
 	"path/filepath"
 
+	"zonekit/internal/cmdutil"
+	"zonekit/pkg/config"
+	"zonekit/pkg/domain"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
-	"namecheap-dns-manager/pkg/config"
 )
 
 // configCmd represents the config command
@@ -33,12 +36,12 @@ var configSetCmd = &cobra.Command{
 		clientIP := viper.GetString("client-ip")
 		sandbox := viper.GetBool("sandbox")
 
-		fmt.Println("Namecheap Configuration Setup")
-		fmt.Println("=============================")
+		fmt.Println("DNS Provider Configuration Setup")
+		fmt.Println("=================================")
 		fmt.Println()
 
 		// Username
-		fmt.Print("Namecheap Username")
+		fmt.Print("Provider Username")
 		if username != "" {
 			fmt.Printf(" [%s]", username)
 		}
@@ -149,7 +152,7 @@ var configShowCmd = &cobra.Command{
 		fmt.Println()
 		if username == "" || apiUser == "" || apiKey == "" || clientIP == "" {
 			fmt.Println("⚠️  Some required configuration values are missing.")
-			fmt.Println("   Run 'namecheap-dns config set' to configure them.")
+			fmt.Println("   Run 'zonekit config set' to configure them.")
 		} else {
 			fmt.Println("✅ Configuration appears complete.")
 		}
@@ -169,7 +172,7 @@ var configInitCmd = &cobra.Command{
 			return fmt.Errorf("failed to get home directory: %w", err)
 		}
 
-		configPath := filepath.Join(home, ".namecheap-dns.yaml")
+		configPath := filepath.Join(home, ".zonekit.yaml")
 
 		// Check if file already exists
 		if _, err := os.Stat(configPath); err == nil {
@@ -185,7 +188,7 @@ var configInitCmd = &cobra.Command{
 
 		// Create example config
 		config := map[string]interface{}{
-			"username":    "your-namecheap-username",
+			"username":    "your-provider-username",
 			"api_user":    "your-api-username",
 			"api_key":     "your-api-key",
 			"client_ip":   "your.public.ip.address",
@@ -204,7 +207,7 @@ var configInitCmd = &cobra.Command{
 
 		fmt.Printf("Configuration file created at %s\n", configPath)
 		fmt.Println("Please edit the file with your actual values, then run:")
-		fmt.Println("  namecheap-dns config show")
+		fmt.Println("  zonekit config show")
 
 		return nil
 	},
@@ -214,7 +217,7 @@ var configInitCmd = &cobra.Command{
 var configValidateCmd = &cobra.Command{
 	Use:   "validate",
 	Short: "Validate configuration and test API connection",
-	Long:  `Validate the current configuration and test the connection to Namecheap API.`,
+	Long:  `Validate the current configuration and test the connection to DNS provider API.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Validating configuration...")
 
@@ -242,13 +245,27 @@ var configValidateCmd = &cobra.Command{
 		// Test API connection
 		fmt.Println("Testing API connection...")
 
-		// TODO: Implement actual API test
-		// This would involve creating a client and making a simple API call
-		// For now, just validate the configuration format
+		// Create a test client to validate credentials
+		testClient, err := cmdutil.CreateClient(&config.AccountConfig{
+			Username: username,
+			APIUser:  apiUser,
+			APIKey:   apiKey,
+			ClientIP: clientIP,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create test client: %w", err)
+		}
 
-		fmt.Println("✅ Configuration appears valid")
+		// Test the connection by making a simple API call
+		domainService := domain.NewService(testClient)
+		_, err = domainService.ListDomains()
+		if err != nil {
+			return fmt.Errorf("API connection test failed: %w", err)
+		}
+
+		fmt.Printf("✅ API connection successful - Account: %s\n", testClient.GetAccountName())
 		fmt.Println()
-		fmt.Println("Note: Run 'namecheap-dns domain list' to test the actual API connection.")
+		fmt.Println("Note: Run 'zonekit domain list' to test the actual API connection.")
 
 		return nil
 	},
@@ -260,7 +277,7 @@ func saveConfig(config map[string]interface{}) error {
 		return fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	configPath := filepath.Join(home, ".namecheap-dns.yaml")
+	configPath := filepath.Join(home, ".zonekit.yaml")
 
 	data, err := yaml.Marshal(config)
 	if err != nil {

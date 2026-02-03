@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"zonekit/pkg/client"
+	"zonekit/pkg/pointer"
+
 	"github.com/namecheap/go-namecheap-sdk/v2/namecheap"
-	"namecheap-dns-manager/pkg/client"
-	"namecheap-dns-manager/pkg/pointer"
 )
 
 // Service provides domain management operations
@@ -97,9 +98,10 @@ func (s *Service) GetDomainInfo(domainName string) (*Domain, error) {
 
 // CheckAvailability checks if a domain is available for registration
 func (s *Service) CheckAvailability(domainName string) (bool, error) {
-	// TODO: Implement domain availability check
-	// The SDK doesn't seem to have a direct check method in the current version
-	return false, fmt.Errorf("domain availability check not yet implemented - TODO: add domains.check API")
+	// Note: The current Namecheap SDK (v2.4.1) doesn't implement domain availability checking
+	// This would require implementing a direct API call to the domains.check endpoint
+	// For now, return an informative error
+	return false, fmt.Errorf("domain availability check not supported by current SDK version - please check manually at namecheap.com")
 }
 
 // RegisterDomain registers a new domain (placeholder - needs contact info)
@@ -127,9 +129,7 @@ func (s *Service) GetNameservers(domainName string) ([]string, error) {
 	}
 
 	nameservers := make([]string, 0, len(*resp.DomainDNSGetListResult.Nameservers))
-	for _, ns := range *resp.DomainDNSGetListResult.Nameservers {
-		nameservers = append(nameservers, ns)
-	}
+	nameservers = append(nameservers, *resp.DomainDNSGetListResult.Nameservers...)
 
 	return nameservers, nil
 }

@@ -1,20 +1,22 @@
-# Namecheap DNS Manager Configuration
-# Copy this file to ~/.namecheap-dns.yaml and fill in your credentials
+# ZoneKit Configuration
+# Copy this file to ~/.zonekit.yaml and fill in your credentials
 
 # Multi-account configuration
 # You can have multiple accounts and easily switch between them
 accounts:
   # Default account (used when no specific account is selected)
   default:
+    provider: "namecheap"  # DNS provider: "namecheap", "cloudflare", etc.
     username: "your-namecheap-username"
     api_user: "your-api-username"
     api_key: "your-api-key-here"
     client_ip: "your.public.ip.address"
     use_sandbox: false
     description: "My main Namecheap account"
-  
+
   # Additional accounts (optional)
   # work:
+  #   provider: "namecheap"
   #   username: "work-username"
   #   api_user: "work-api-username"
   #   api_key: "work-api-key"
@@ -22,9 +24,16 @@ accounts:
   #   use_sandbox: false
   #   description: "Work account for company domains"
 
+  # Example: Cloudflare account (when Cloudflare provider is implemented)
+  # cloudflare:
+  #   provider: "cloudflare"
+  #   api_key: "your-cloudflare-api-key"
+  #   email: "your-email@example.com"
+  #   description: "Cloudflare account"
+
 # Legacy single-account configuration (for backward compatibility)
 # These will be automatically migrated to the new format
-username: "your-namecheap-username"
+username: "your-provider-username"
 api_user: "your-api-username"
 api_key: "your-api-key-here"
 client_ip: "your.public.ip.address"

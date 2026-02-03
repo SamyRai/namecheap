@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"namecheap-dns-manager/pkg/validation"
+	"zonekit/pkg/validation"
 )
 
 // ValidateDomain validates a domain name format.

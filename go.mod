@@ -1,4 +1,4 @@
-module namecheap-dns-manager
+module zonekit
 
 go 1.23.0
 
