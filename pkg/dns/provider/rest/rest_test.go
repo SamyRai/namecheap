@@ -40,3 +40,37 @@ func TestDeleteRecord_MissingEndpoint_Error(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "delete_record endpoint not configured")
 }
+
+func TestListZones_StaticConfig(t *testing.T) {
+	client := httpclient.NewClient(httpclient.ClientConfig{BaseURL: "http://example.invalid"})
+	mappings := mapper.DefaultMappings()
+	settings := map[string]interface{}{"zone_id": "static-zone"}
+	p := NewRESTProvider("test", client, mappings, map[string]string{}, settings)
+
+	zones, err := p.ListZones(context.Background())
+	require.NoError(t, err)
+	require.Len(t, zones, 1)
+	require.Equal(t, "static-zone", zones[0].ID)
+}
+
+func TestListZones_Endpoint(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/zones" {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"zones": [{"id": "z1", "name": "example.com"}]}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	client := httpclient.NewClient(httpclient.ClientConfig{BaseURL: ts.URL})
+	mappings := mapper.DefaultMappings()
+	p := NewRESTProvider("test", client, mappings, map[string]string{"list_zones": "/zones"}, nil)
+
+	zones, err := p.ListZones(context.Background())
+	require.NoError(t, err)
+	require.Len(t, zones, 1)
+	require.Equal(t, "z1", zones[0].ID)
+	require.Equal(t, "example.com", zones[0].Name)
+}

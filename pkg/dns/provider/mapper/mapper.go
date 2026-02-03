@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 
+	"zonekit/pkg/dns/provider"
 	"zonekit/pkg/dnsrecord"
 )
 
@@ -13,6 +14,11 @@ type Mappings struct {
 	Request  FieldMapping
 	Response FieldMapping
 	ListPath string // JSON path to records array (e.g., "result" or "data.records")
+
+	// Zone Mappings
+	ZoneListPath string // JSON path to zones array
+	ZoneID       string // Field name for Zone ID
+	ZoneName     string // Field name for Zone Name
 }
 
 // FieldMapping defines how to map fields
@@ -45,6 +51,9 @@ func DefaultMappings() Mappings {
 			ID:         "",
 		},
 		ListPath: "records",
+		ZoneListPath: "zones",
+		ZoneID:       "id",
+		ZoneName:     "name",
 	}
 }
 
@@ -128,6 +137,45 @@ func FromProviderFormat(data map[string]interface{}, mapping FieldMapping) (dnsr
 
 // ExtractRecords extracts records from a JSON response using the list path
 func ExtractRecords(data interface{}, listPath string) ([]map[string]interface{}, error) {
+	return extractList(data, listPath)
+}
+
+// ExtractZones extracts zones from a JSON response using the list path
+func ExtractZones(data interface{}, listPath string) ([]map[string]interface{}, error) {
+	return extractList(data, listPath)
+}
+
+// FromProviderZoneFormat converts provider's zone format to provider.Zone
+func FromProviderZoneFormat(data map[string]interface{}, mappings Mappings) (provider.Zone, error) {
+	zone := provider.Zone{}
+
+	getString := func(key string) string {
+		if val, ok := data[key]; ok {
+			if str, ok := val.(string); ok {
+				return str
+			}
+			return fmt.Sprintf("%v", val)
+		}
+		return ""
+	}
+
+	if mappings.ZoneID != "" {
+		zone.ID = getString(mappings.ZoneID)
+	}
+	if mappings.ZoneName != "" {
+		zone.Name = getString(mappings.ZoneName)
+	}
+
+	if zone.ID == "" {
+		return zone, fmt.Errorf("zone ID not found in response (mapped to %s)", mappings.ZoneID)
+	}
+
+	return zone, nil
+}
+
+
+// extractList is a helper to extract a list of maps from a JSON response
+func extractList(data interface{}, listPath string) ([]map[string]interface{}, error) {
 	if listPath == "" {
 		// Default: assume data is an array
 		if arr, ok := data.([]interface{}); ok {

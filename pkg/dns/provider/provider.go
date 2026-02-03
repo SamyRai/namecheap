@@ -121,4 +121,9 @@ type FieldMappings struct {
 
 	// List response structure (for REST providers)
 	ListPath string `yaml:"list_path,omitempty"` // JSON path to records array, e.g., "data.records"
+
+	// Zone Mappings
+	ZoneListPath string `yaml:"zone_list_path,omitempty"`
+	ZoneID       string `yaml:"zone_id,omitempty"`
+	ZoneName     string `yaml:"zone_name,omitempty"`
 }

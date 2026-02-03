@@ -7,6 +7,19 @@ servers:
   - url: https://api.cloudflare.com/client/v4
     description: Cloudflare API v4
 paths:
+  /zones:
+    get:
+      summary: List Zones
+      operationId: listZones
+      tags:
+        - Zones
+      responses:
+        '200':
+          description: List of Zones
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ZoneResponse'
   /zones/{zone_id}/dns_records:
     get:
       summary: List DNS records
@@ -223,6 +236,24 @@ components:
       properties:
         result:
           $ref: '#/components/schemas/DNSRecord'
+    Zone:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Zone identifier
+        name:
+          type: string
+          description: Zone name
+        status:
+          type: string
+    ZoneResponse:
+      type: object
+      properties:
+        result:
+          type: array
+          items:
+            $ref: '#/components/schemas/Zone'
 security:
   - ApiKeyAuth: []
   - EmailAuth: []

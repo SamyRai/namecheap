@@ -45,7 +45,18 @@ func (p *RESTProvider) Name() string {
 
 // ListZones retrieves all zones managed by the provider
 func (p *RESTProvider) ListZones(ctx context.Context) ([]dnsprovider.Zone, error) {
-	// check for list_zones or zones endpoint
+	// 1. Check if a static zone_id is configured in settings
+	if zoneID, ok := p.settings["zone_id"].(string); ok && zoneID != "" {
+		zoneName := zoneID // Default name to ID if not provided
+		if name, ok := p.settings["zone_name"].(string); ok && name != "" {
+			zoneName = name
+		}
+		return []dnsprovider.Zone{
+			{ID: zoneID, Name: zoneName},
+		}, nil
+	}
+
+	// 2. Use list_zones endpoint if available
 	endpoint, ok := p.endpoints["list_zones"]
 	if !ok {
 		endpoint, ok = p.endpoints["zones"]
@@ -65,13 +76,84 @@ func (p *RESTProvider) ListZones(ctx context.Context) ([]dnsprovider.Zone, error
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	// TODO: Implement zone mapping
-	return []dnsprovider.Zone{}, nil
+	zoneMaps, err := mapper.ExtractZones(responseData, p.mappings.ZoneListPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract zones: %w", err)
+	}
+
+	zones := make([]dnsprovider.Zone, 0, len(zoneMaps))
+	for _, zoneMap := range zoneMaps {
+		zone, err := mapper.FromProviderZoneFormat(zoneMap, p.mappings)
+		if err != nil {
+			// Log error but continue? Or fail? For now, fail.
+			return nil, fmt.Errorf("failed to convert zone: %w", err)
+		}
+		zones = append(zones, zone)
+	}
+
+	return zones, nil
 }
 
 // GetZone retrieves a specific zone by ID
 func (p *RESTProvider) GetZone(ctx context.Context, zoneID string) (dnsprovider.Zone, error) {
-	// Stub: return a zone with the ID and Name = ID
+	// 1. Check if a static zone_id matches
+	if configuredID, ok := p.settings["zone_id"].(string); ok && configuredID == zoneID {
+		zoneName := zoneID
+		if name, ok := p.settings["zone_name"].(string); ok && name != "" {
+			zoneName = name
+		}
+		return dnsprovider.Zone{ID: zoneID, Name: zoneName}, nil
+	}
+
+	// 2. Use get_zone endpoint if available
+	endpoint, ok := p.endpoints["get_zone"]
+	if ok {
+		endpoint = strings.ReplaceAll(endpoint, "{zone_id}", zoneID)
+		endpoint = strings.ReplaceAll(endpoint, "{id}", zoneID)
+
+		resp, err := p.client.Get(ctx, endpoint, nil)
+		if err != nil {
+			return dnsprovider.Zone{}, errors.NewAPI("GetZone", fmt.Sprintf("failed to get zone %s", zoneID), err)
+		}
+
+		var responseData interface{}
+		if err := httpprovider.ParseJSONResponse(resp, &responseData); err != nil {
+			return dnsprovider.Zone{}, fmt.Errorf("failed to parse response: %w", err)
+		}
+
+		// Assuming response is the zone object directly or wrapped in result
+		// We can try to reuse ExtractZones if it handles single object or wrap it?
+		// Or assume single object mapping.
+		// Usually REST APIs return { "result": { ... } } or just { ... }
+
+		// If responseData has the wrapper path (e.g. "result"), extract it
+		dataToMap := responseData
+		if p.mappings.ZoneListPath != "" && p.mappings.ZoneListPath != "zones" { // Heuristic: list path might also be response wrapper
+			// Simple check: is it a map with that key?
+			if m, ok := responseData.(map[string]interface{}); ok {
+				if val, ok := m[p.mappings.ZoneListPath]; ok {
+					// Check if val is map (single object) or array (list)
+					// For GetZone, expect map
+					if vMap, ok := val.(map[string]interface{}); ok {
+						dataToMap = vMap
+					}
+				}
+			}
+		} else if m, ok := responseData.(map[string]interface{}); ok {
+			// standard "result" wrapper check
+			if res, ok := m["result"]; ok {
+				dataToMap = res
+			}
+		}
+
+		if m, ok := dataToMap.(map[string]interface{}); ok {
+			return mapper.FromProviderZoneFormat(m, p.mappings)
+		}
+		return dnsprovider.Zone{}, fmt.Errorf("unexpected response format for GetZone")
+	}
+
+	// Fallback/Stub: return a zone with the ID and Name = ID
+	// This maintains compatibility for simple providers where ID=Name
 	return dnsprovider.Zone{ID: zoneID, Name: zoneID}, nil
 }
 
@@ -207,7 +289,7 @@ func (p *RESTProvider) BulkReplaceRecords(ctx context.Context, zoneID string, re
 // Capabilities returns the provider's capabilities
 func (p *RESTProvider) Capabilities() dnsprovider.ProviderCapabilities {
 	return dnsprovider.ProviderCapabilities{
-		CanListZones:    p.hasEndpoint("list_zones") || p.hasEndpoint("zones"),
+		CanListZones:    p.hasEndpoint("list_zones") || p.hasEndpoint("zones") || p.hasSetting("zone_id"),
 		CanGetZone:      true,
 		CanCreateRecord: p.hasEndpoint("create_record"),
 		CanUpdateRecord: p.hasEndpoint("update_record"),
@@ -218,6 +300,11 @@ func (p *RESTProvider) Capabilities() dnsprovider.ProviderCapabilities {
 
 func (p *RESTProvider) hasEndpoint(name string) bool {
 	_, ok := p.endpoints[name]
+	return ok
+}
+
+func (p *RESTProvider) hasSetting(name string) bool {
+	_, ok := p.settings[name]
 	return ok
 }
 
