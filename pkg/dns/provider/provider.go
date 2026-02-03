@@ -95,6 +95,12 @@ type FieldMappings struct {
 		TTL        string `yaml:"ttl,omitempty"`
 		MXPref     string `yaml:"mx_pref,omitempty"` // e.g., "priority" or "preference"
 		ID         string `yaml:"id,omitempty"`      // provider record ID field
+
+		// Extended fields
+		Priority string `yaml:"priority,omitempty"`
+		Weight   string `yaml:"weight,omitempty"`
+		Port     string `yaml:"port,omitempty"`
+		Target   string `yaml:"target,omitempty"`
 	} `yaml:"request,omitempty"`
 
 	// Response mappings (provider format -> our format)
@@ -105,6 +111,12 @@ type FieldMappings struct {
 		TTL        string `yaml:"ttl,omitempty"`
 		MXPref     string `yaml:"mx_pref,omitempty"`
 		ID         string `yaml:"id,omitempty"` // provider record ID field
+
+		// Extended fields
+		Priority string `yaml:"priority,omitempty"`
+		Weight   string `yaml:"weight,omitempty"`
+		Port     string `yaml:"port,omitempty"`
+		Target   string `yaml:"target,omitempty"`
 	} `yaml:"response,omitempty"`
 
 	// List response structure (for REST providers)

@@ -305,9 +305,23 @@ func (s *Spec) extractMappings() *dnsprovider.FieldMappings {
 			case "priority", "preference", "mxpref", "mx_pref":
 				mappings.Request.MXPref = propName
 				mappings.Response.MXPref = propName
+				// Also map priority to SRV/MX priority field
+				mappings.Request.Priority = propName
+				mappings.Response.Priority = propName
 			case "id", "recordid", "record_id", "_id":
 				mappings.Request.ID = propName
 				mappings.Response.ID = propName
+
+			// New SRV fields
+			case "weight", "srv_weight":
+				mappings.Request.Weight = propName
+				mappings.Response.Weight = propName
+			case "port", "srv_port":
+				mappings.Request.Port = propName
+				mappings.Response.Port = propName
+			case "target", "srv_target":
+				mappings.Request.Target = propName
+				mappings.Response.Target = propName
 			}
 		}
 
