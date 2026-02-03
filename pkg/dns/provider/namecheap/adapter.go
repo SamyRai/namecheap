@@ -1,6 +1,7 @@
 package namecheap
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/namecheap/go-namecheap-sdk/v2/namecheap"
@@ -28,7 +29,47 @@ func (p *NamecheapProvider) Name() string {
 	return "namecheap"
 }
 
-// GetRecords retrieves all DNS records for a domain
+// Capabilities returns the provider capabilities
+func (p *NamecheapProvider) Capabilities() dnsprovider.ProviderCapabilities {
+	return dnsprovider.ProviderCapabilities{}
+}
+
+// ListZones returns a list of zones
+func (p *NamecheapProvider) ListZones(ctx context.Context) ([]dnsprovider.Zone, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetZone returns details for a specific zone
+func (p *NamecheapProvider) GetZone(ctx context.Context, domain string) (*dnsprovider.Zone, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// ListRecords retrieves all DNS records for a zone
+func (p *NamecheapProvider) ListRecords(ctx context.Context, zoneID string) ([]dnsrecord.Record, error) {
+	return p.GetRecords(zoneID)
+}
+
+// CreateRecord creates a new record in the zone
+func (p *NamecheapProvider) CreateRecord(ctx context.Context, zoneID string, record dnsrecord.Record) (*dnsrecord.Record, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// UpdateRecord updates an existing record
+func (p *NamecheapProvider) UpdateRecord(ctx context.Context, zoneID string, recordID string, record dnsrecord.Record) (*dnsrecord.Record, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// DeleteRecord deletes a record
+func (p *NamecheapProvider) DeleteRecord(ctx context.Context, zoneID string, recordID string) error {
+	return fmt.Errorf("not implemented")
+}
+
+// BulkReplaceRecords replaces all records in a zone
+func (p *NamecheapProvider) BulkReplaceRecords(ctx context.Context, zoneID string, records []dnsrecord.Record) error {
+	return p.SetRecords(zoneID, records)
+}
+
+// GetRecords retrieves all DNS records for a domain (Legacy helper)
 func (p *NamecheapProvider) GetRecords(domainName string) ([]dnsrecord.Record, error) {
 	nc := p.client.GetNamecheapClient()
 
@@ -57,7 +98,7 @@ func (p *NamecheapProvider) GetRecords(domainName string) ([]dnsrecord.Record, e
 	return records, nil
 }
 
-// SetRecords sets DNS records for a domain (replaces all existing records)
+// SetRecords sets DNS records for a domain (replaces all existing records) (Legacy helper)
 func (p *NamecheapProvider) SetRecords(domainName string, records []dnsrecord.Record) error {
 	nc := p.client.GetNamecheapClient()
 
@@ -107,7 +148,7 @@ func (p *NamecheapProvider) SetRecords(domainName string, records []dnsrecord.Re
 	return nil
 }
 
-// Validate checks if the provider is properly configured
+// Validate checks if the provider is properly configured (Legacy)
 func (p *NamecheapProvider) Validate() error {
 	if p.client == nil {
 		return fmt.Errorf("namecheap client is not initialized")

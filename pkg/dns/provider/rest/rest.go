@@ -43,7 +43,56 @@ func (p *RESTProvider) Name() string {
 	return p.name
 }
 
-// GetRecords retrieves all DNS records for a domain
+// Capabilities returns the provider capabilities
+func (p *RESTProvider) Capabilities() dnsprovider.ProviderCapabilities {
+	return dnsprovider.ProviderCapabilities{}
+}
+
+// ListZones returns a list of zones
+func (p *RESTProvider) ListZones(ctx context.Context) ([]dnsprovider.Zone, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetZone returns details for a specific zone
+func (p *RESTProvider) GetZone(ctx context.Context, domain string) (*dnsprovider.Zone, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// ListRecords retrieves all DNS records for a zone
+func (p *RESTProvider) ListRecords(ctx context.Context, zoneID string) ([]dnsrecord.Record, error) {
+	// Legacy implementation adapter
+	return p.GetRecords(zoneID)
+}
+
+// CreateRecord creates a new record in the zone
+func (p *RESTProvider) CreateRecord(ctx context.Context, zoneID string, record dnsrecord.Record) (*dnsrecord.Record, error) {
+	// Legacy implementation adapter
+	err := p.createRecord(ctx, zoneID, record)
+	if err != nil {
+		return nil, err
+	}
+	// Return the record as is, since legacy createRecord doesn't return the created record
+	return &record, nil
+}
+
+// UpdateRecord updates an existing record
+func (p *RESTProvider) UpdateRecord(ctx context.Context, zoneID string, recordID string, record dnsrecord.Record) (*dnsrecord.Record, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// DeleteRecord deletes a record
+func (p *RESTProvider) DeleteRecord(ctx context.Context, zoneID string, recordID string) error {
+	// Legacy implementation adapter
+	return p.deleteRecord(ctx, zoneID, dnsrecord.Record{ID: recordID})
+}
+
+// BulkReplaceRecords replaces all records in a zone
+func (p *RESTProvider) BulkReplaceRecords(ctx context.Context, zoneID string, records []dnsrecord.Record) error {
+	// Legacy implementation adapter
+	return p.SetRecords(zoneID, records)
+}
+
+// GetRecords retrieves all DNS records for a domain (Legacy helper)
 func (p *RESTProvider) GetRecords(domainName string) ([]dnsrecord.Record, error) {
 	endpoint, ok := p.endpoints["get_records"]
 	if !ok {
@@ -93,7 +142,7 @@ func (p *RESTProvider) GetRecords(domainName string) ([]dnsrecord.Record, error)
 	return records, nil
 }
 
-// SetRecords sets DNS records for a domain (replaces all existing records)
+// SetRecords sets DNS records for a domain (Legacy helper)
 func (p *RESTProvider) SetRecords(domainName string, records []dnsrecord.Record) error {
 	// Most REST APIs don't support bulk replace, so we need to:
 	// 1. Get existing records
@@ -185,7 +234,7 @@ func (p *RESTProvider) deleteRecord(ctx context.Context, domainName string, reco
 	return nil
 }
 
-// Validate checks if the provider is properly configured
+// Validate checks if the provider is properly configured (Legacy)
 func (p *RESTProvider) Validate() error {
 	if p.client == nil {
 		return fmt.Errorf("HTTP client is not initialized")

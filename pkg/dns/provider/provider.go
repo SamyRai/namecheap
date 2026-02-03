@@ -1,22 +1,54 @@
 package provider
 
 import (
+	"context"
 	"zonekit/pkg/dnsrecord"
 )
+
+// ProviderCapabilities describes what a provider supports
+type ProviderCapabilities struct {
+	SupportsRecordID      bool
+	SupportsBulkReplace   bool
+	SupportsZoneDiscovery bool
+	SupportedRecordTypes  []string
+	RequiresPlanApproval  bool
+}
+
+// Zone represents a DNS zone
+type Zone struct {
+	ID       string                 `json:"id"`
+	Name     string                 `json:"name"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+}
 
 // Provider defines the interface that all DNS providers must implement
 type Provider interface {
 	// Name returns the provider name (e.g., "namecheap", "cloudflare", "godaddy")
 	Name() string
 
-	// GetRecords retrieves all DNS records for a domain
-	GetRecords(domainName string) ([]dnsrecord.Record, error)
+	// Capabilities returns the provider's capabilities
+	Capabilities() ProviderCapabilities
 
-	// SetRecords sets DNS records for a domain (replaces all existing records)
-	SetRecords(domainName string, records []dnsrecord.Record) error
+	// ListZones returns a list of zones managed by the provider
+	ListZones(ctx context.Context) ([]Zone, error)
 
-	// Validate checks if the provider is properly configured
-	Validate() error
+	// GetZone returns details for a specific zone
+	GetZone(ctx context.Context, domain string) (*Zone, error)
+
+	// ListRecords retrieves all DNS records for a zone
+	ListRecords(ctx context.Context, zoneID string) ([]dnsrecord.Record, error)
+
+	// CreateRecord creates a new record in the zone
+	CreateRecord(ctx context.Context, zoneID string, record dnsrecord.Record) (*dnsrecord.Record, error)
+
+	// UpdateRecord updates an existing record
+	UpdateRecord(ctx context.Context, zoneID string, recordID string, record dnsrecord.Record) (*dnsrecord.Record, error)
+
+	// DeleteRecord deletes a record
+	DeleteRecord(ctx context.Context, zoneID string, recordID string) error
+
+	// BulkReplaceRecords replaces all records in a zone (if supported)
+	BulkReplaceRecords(ctx context.Context, zoneID string, records []dnsrecord.Record) error
 }
 
 // Config represents provider-specific configuration

@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -16,7 +17,6 @@ type mockProvider struct {
 	records         map[string][]dnsrecord.Record
 	getRecordsError error
 	setRecordsError error
-	validateError   error
 }
 
 func newMockProvider(name string) *mockProvider {
@@ -28,6 +28,38 @@ func newMockProvider(name string) *mockProvider {
 
 func (m *mockProvider) Name() string {
 	return m.name
+}
+
+func (m *mockProvider) Capabilities() provider.ProviderCapabilities {
+	return provider.ProviderCapabilities{}
+}
+
+func (m *mockProvider) ListZones(ctx context.Context) ([]provider.Zone, error) {
+	return nil, nil
+}
+
+func (m *mockProvider) GetZone(ctx context.Context, domain string) (*provider.Zone, error) {
+	return nil, nil
+}
+
+func (m *mockProvider) ListRecords(ctx context.Context, zoneID string) ([]dnsrecord.Record, error) {
+	return m.GetRecords(zoneID)
+}
+
+func (m *mockProvider) CreateRecord(ctx context.Context, zoneID string, record dnsrecord.Record) (*dnsrecord.Record, error) {
+	return nil, nil
+}
+
+func (m *mockProvider) UpdateRecord(ctx context.Context, zoneID string, recordID string, record dnsrecord.Record) (*dnsrecord.Record, error) {
+	return nil, nil
+}
+
+func (m *mockProvider) DeleteRecord(ctx context.Context, zoneID string, recordID string) error {
+	return nil
+}
+
+func (m *mockProvider) BulkReplaceRecords(ctx context.Context, zoneID string, records []dnsrecord.Record) error {
+	return m.SetRecords(zoneID, records)
 }
 
 func (m *mockProvider) GetRecords(domainName string) ([]dnsrecord.Record, error) {
@@ -43,10 +75,6 @@ func (m *mockProvider) SetRecords(domainName string, records []dnsrecord.Record)
 	}
 	m.records[domainName] = records
 	return nil
-}
-
-func (m *mockProvider) Validate() error {
-	return m.validateError
 }
 
 // ServiceTestSuite is a test suite for DNS service

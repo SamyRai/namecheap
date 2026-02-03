@@ -8,6 +8,14 @@ type Record struct {
 	Address    string
 	TTL        int
 	MXPref     int
+
+	// Extended fields for Provider Contract v2
+	Priority int                    // MX and SRV priority
+	Weight   int                    // SRV weight
+	Port     int                    // SRV port
+	Target   string                 // SRV and MX target
+	Metadata map[string]interface{} // Provider-specific metadata
+	Raw      interface{}            // Original provider response
 }
 
 // RecordType constants
