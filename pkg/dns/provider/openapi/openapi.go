@@ -136,7 +136,16 @@ func (s *Spec) extractEndpoints() map[string]string {
 			operationID, _ := opMap["operationId"].(string)
 			endpointKey := s.mapOperationToEndpoint(method, operationID, path)
 			if endpointKey != "" {
-				endpoints[endpointKey] = path
+				// Avoid overwriting existing endpoints with single-item paths (prefer list endpoints)
+				if existing, ok := endpoints[endpointKey]; ok && existing != "" {
+					// Prefer the endpoint without path parameters
+					if strings.Contains(existing, "{") && !strings.Contains(path, "{") {
+						endpoints[endpointKey] = path
+					}
+					// otherwise keep existing
+				} else {
+					endpoints[endpointKey] = path
+				}
 			}
 		}
 	}
@@ -261,6 +270,7 @@ func (s *Spec) extractMappings() *dnsprovider.FieldMappings {
 
 	// Look for DNS record schema
 	for schemaName, schema := range s.Components.Schemas {
+		origName := schemaName
 		schemaName = strings.ToLower(schemaName)
 		if !strings.Contains(schemaName, "record") && !strings.Contains(schemaName, "dns") {
 			continue
@@ -301,9 +311,37 @@ func (s *Spec) extractMappings() *dnsprovider.FieldMappings {
 			}
 		}
 
-		// Try to find list path from schema name or structure
-		if strings.Contains(schemaName, "list") || strings.Contains(schemaName, "array") {
-			mappings.ListPath = "result"
+		// Try to find list path by inspecting other schemas for arrays of this schema
+		for _, otherSchema := range s.Components.Schemas {
+			otherSchemaMap, ok := otherSchema.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			// Look for properties that are arrays with items referencing this schema
+			if props, ok := otherSchemaMap["properties"].(map[string]interface{}); ok {
+				for propName, prop := range props {
+					propMap, ok := prop.(map[string]interface{})
+					if !ok {
+						continue
+					}
+
+					if propMap["type"] == "array" {
+						if items, ok := propMap["items"].(map[string]interface{}); ok {
+							if ref, ok := items["$ref"].(string); ok {
+								refLower := strings.ToLower(ref)
+								if strings.Contains(refLower, strings.ToLower(origName)) || strings.HasSuffix(refLower, "/"+strings.ToLower(origName)) {
+									mappings.ListPath = propName
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+			if mappings.ListPath != "" {
+				break
+			}
 		}
 	}
 
