@@ -23,6 +23,12 @@ type FieldMapping struct {
 	TTL        string
 	MXPref     string
 	ID         string
+
+	// Extended fields
+	Priority string // SRV/MX priority
+	Weight   string // SRV weight
+	Port     string // SRV port
+	Target   string // SRV/MX target
 }
 
 // DefaultMappings returns default mappings (no transformation needed)
@@ -34,7 +40,11 @@ func DefaultMappings() Mappings {
 			Address:    "address",
 			TTL:        "ttl",
 			MXPref:     "mx_pref",
-			ID:         "",
+			ID:         "id",
+			Priority:   "priority",
+			Weight:     "weight",
+			Port:       "port",
+			Target:     "target",
 		},
 		Response: FieldMapping{
 			HostName:   "hostname",
@@ -42,7 +52,11 @@ func DefaultMappings() Mappings {
 			Address:    "address",
 			TTL:        "ttl",
 			MXPref:     "mx_pref",
-			ID:         "",
+			ID:         "id",
+			Priority:   "priority",
+			Weight:     "weight",
+			Port:       "port",
+			Target:     "target",
 		},
 		ListPath: "records",
 	}
@@ -71,12 +85,33 @@ func ToProviderFormat(record dnsrecord.Record, mapping FieldMapping) map[string]
 		result[mapping.ID] = record.ID
 	}
 
+	// Extended fields
+	if mapping.Priority != "" && record.Priority > 0 {
+		result[mapping.Priority] = record.Priority
+	}
+	if mapping.Weight != "" && record.Weight > 0 {
+		result[mapping.Weight] = record.Weight
+	}
+	if mapping.Port != "" && record.Port > 0 {
+		result[mapping.Port] = record.Port
+	}
+	if mapping.Target != "" && record.Target != "" {
+		result[mapping.Target] = record.Target
+	}
+
+	// Metadata pass-through (if supported by provider via "metadata" field or root merge)
+	// For now, we don't automatically merge metadata into the root map to avoid collisions,
+	// unless we decide on a specific "metadata" field name convention or explicit mapping.
+	// Current decision: Only mapped fields are sent. Metadata handling might be provider specific.
+
 	return result
 }
 
 // FromProviderFormat converts provider's format to dnsrecord.Record
 func FromProviderFormat(data map[string]interface{}, mapping FieldMapping) (dnsrecord.Record, error) {
-	record := dnsrecord.Record{}
+	record := dnsrecord.Record{
+		Raw: data, // Preserve original response
+	}
 
 	// Helper to get string value
 	getString := func(key string) string {
@@ -98,6 +133,10 @@ func FromProviderFormat(data map[string]interface{}, mapping FieldMapping) (dnsr
 			case int64:
 				return int(v)
 			case float64:
+				return int(v)
+			case uint:
+				return int(v)
+			case uint64:
 				return int(v)
 			}
 		}
@@ -121,6 +160,27 @@ func FromProviderFormat(data map[string]interface{}, mapping FieldMapping) (dnsr
 	}
 	if mapping.ID != "" {
 		record.ID = getString(mapping.ID)
+	}
+
+	// Extended fields
+	if mapping.Priority != "" {
+		record.Priority = getInt(mapping.Priority)
+	}
+	if mapping.Weight != "" {
+		record.Weight = getInt(mapping.Weight)
+	}
+	if mapping.Port != "" {
+		record.Port = getInt(mapping.Port)
+	}
+	if mapping.Target != "" {
+		record.Target = getString(mapping.Target)
+	}
+
+	// Preserve all fields as Metadata, excluding mapped fields to reduce noise?
+	// Or just copy everything.
+	record.Metadata = make(map[string]interface{})
+	for k, v := range data {
+		record.Metadata[k] = v
 	}
 
 	return record, nil
@@ -150,7 +210,9 @@ func ExtractRecords(data interface{}, listPath string) ([]map[string]interface{}
 			key := reflect.ValueOf(part)
 			current = current.MapIndex(key)
 			if !current.IsValid() {
-				return nil, fmt.Errorf("path '%s' not found in response", listPath)
+				// Path not found - return empty list instead of error?
+				// Some APIs might return empty object instead of empty list
+				return []map[string]interface{}{}, nil
 			}
 		case reflect.Slice, reflect.Array:
 			// If we hit an array/slice, we're done navigating
@@ -166,6 +228,7 @@ func ExtractRecords(data interface{}, listPath string) ([]map[string]interface{}
 	}
 
 	if current.Kind() != reflect.Slice && current.Kind() != reflect.Array {
+		// It might be a single object, or null?
 		return nil, fmt.Errorf("path '%s' does not point to an array", listPath)
 	}
 

@@ -90,79 +90,47 @@ func buildMappings(configMappings *dnsprovider.FieldMappings) mapper.Mappings {
 		ListPath: configMappings.ListPath,
 	}
 
+	// Helper to set mapping with default
+	set := func(target *string, value string, def string) {
+		if value != "" {
+			*target = value
+		} else {
+			*target = def
+		}
+	}
+
+	// Helper to set mapping without default
+	setNoDef := func(target *string, value string) {
+		if value != "" {
+			*target = value
+		}
+	}
+
 	// Request mappings
-	if configMappings.Request.HostName != "" {
-		m.Request.HostName = configMappings.Request.HostName
-	} else {
-		m.Request.HostName = "hostname"
-	}
+	set(&m.Request.HostName, configMappings.Request.HostName, "hostname")
+	set(&m.Request.RecordType, configMappings.Request.RecordType, "record_type")
+	set(&m.Request.Address, configMappings.Request.Address, "address")
+	set(&m.Request.TTL, configMappings.Request.TTL, "ttl")
+	set(&m.Request.MXPref, configMappings.Request.MXPref, "mx_pref")
+	setNoDef(&m.Request.ID, configMappings.Request.ID)
 
-	if configMappings.Request.RecordType != "" {
-		m.Request.RecordType = configMappings.Request.RecordType
-	} else {
-		m.Request.RecordType = "record_type"
-	}
-
-	if configMappings.Request.Address != "" {
-		m.Request.Address = configMappings.Request.Address
-	} else {
-		m.Request.Address = "address"
-	}
-
-	if configMappings.Request.TTL != "" {
-		m.Request.TTL = configMappings.Request.TTL
-	} else {
-		m.Request.TTL = "ttl"
-	}
-
-	if configMappings.Request.MXPref != "" {
-		m.Request.MXPref = configMappings.Request.MXPref
-	} else {
-		m.Request.MXPref = "mx_pref"
-	}
-
-	if configMappings.Request.ID != "" {
-		m.Request.ID = configMappings.Request.ID
-	} else {
-		m.Request.ID = ""
-	}
+	set(&m.Request.Priority, configMappings.Request.Priority, "priority")
+	set(&m.Request.Weight, configMappings.Request.Weight, "weight")
+	set(&m.Request.Port, configMappings.Request.Port, "port")
+	set(&m.Request.Target, configMappings.Request.Target, "target")
 
 	// Response mappings
-	if configMappings.Response.HostName != "" {
-		m.Response.HostName = configMappings.Response.HostName
-	} else {
-		m.Response.HostName = "hostname"
-	}
+	set(&m.Response.HostName, configMappings.Response.HostName, "hostname")
+	set(&m.Response.RecordType, configMappings.Response.RecordType, "record_type")
+	set(&m.Response.Address, configMappings.Response.Address, "address")
+	set(&m.Response.TTL, configMappings.Response.TTL, "ttl")
+	set(&m.Response.MXPref, configMappings.Response.MXPref, "mx_pref")
+	setNoDef(&m.Response.ID, configMappings.Response.ID)
 
-	if configMappings.Response.RecordType != "" {
-		m.Response.RecordType = configMappings.Response.RecordType
-	} else {
-		m.Response.RecordType = "record_type"
-	}
-
-	if configMappings.Response.Address != "" {
-		m.Response.Address = configMappings.Response.Address
-	} else {
-		m.Response.Address = "address"
-	}
-
-	if configMappings.Response.TTL != "" {
-		m.Response.TTL = configMappings.Response.TTL
-	} else {
-		m.Response.TTL = "ttl"
-	}
-
-	if configMappings.Response.MXPref != "" {
-		m.Response.MXPref = configMappings.Response.MXPref
-	} else {
-		m.Response.MXPref = "mx_pref"
-	}
-
-	if configMappings.Response.ID != "" {
-		m.Response.ID = configMappings.Response.ID
-	} else {
-		m.Response.ID = ""
-	}
+	set(&m.Response.Priority, configMappings.Response.Priority, "priority")
+	set(&m.Response.Weight, configMappings.Response.Weight, "weight")
+	set(&m.Response.Port, configMappings.Response.Port, "port")
+	set(&m.Response.Target, configMappings.Response.Target, "target")
 
 	return m
 }

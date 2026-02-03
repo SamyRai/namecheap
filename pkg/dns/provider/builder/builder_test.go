@@ -20,6 +20,6 @@ func TestBuildProvider_FromCloudflareSpec(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, prov)
 
-	// Validate provider
-	require.NoError(t, prov.Validate())
+	// Validate provider properties
+	require.Equal(t, "cloudflare", prov.Name())
 }

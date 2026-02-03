@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -50,12 +51,12 @@ func NewServiceWithProviderName(providerName string) (*Service, error) {
 
 // GetRecords retrieves all DNS records for a domain
 func (s *Service) GetRecords(domainName string) ([]dnsrecord.Record, error) {
-	return s.provider.GetRecords(domainName)
+	return s.provider.ListRecords(context.Background(), domainName)
 }
 
 // SetRecords sets DNS records for a domain (replaces all existing records)
 func (s *Service) SetRecords(domainName string, records []dnsrecord.Record) error {
-	return s.provider.SetRecords(domainName, records)
+	return s.provider.BulkReplaceRecords(context.Background(), domainName, records)
 }
 
 // AddRecord adds a single DNS record to a domain
