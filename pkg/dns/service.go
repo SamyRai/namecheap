@@ -66,11 +66,42 @@ func (s *Service) AddRecord(ctx context.Context, domainName string, record dnsre
 		return fmt.Errorf("invalid record: %w", err)
 	}
 
+	if s.provider.Capabilities().IsBulkReplaceAtomic {
+		// Atomic: Get -> Modify -> Set
+		existingRecords, err := s.GetRecords(ctx, domainName)
+		if err != nil {
+			return fmt.Errorf("failed to get existing records: %w", err)
+		}
+		existingRecords = append(existingRecords, record)
+		return s.SetRecords(ctx, domainName, existingRecords)
+	}
+
 	return s.provider.AddRecord(ctx, domainName, record)
 }
 
 // UpdateRecord updates a DNS record by hostname and type
 func (s *Service) UpdateRecord(ctx context.Context, domainName string, hostname, recordType string, newRecord dnsrecord.Record) error {
+	if s.provider.Capabilities().IsBulkReplaceAtomic {
+		// Atomic: Get -> Modify -> Set
+		existingRecords, err := s.GetRecords(ctx, domainName)
+		if err != nil {
+			return fmt.Errorf("failed to get existing records: %w", err)
+		}
+		found := false
+		for i, r := range existingRecords {
+			if r.HostName == hostname && r.RecordType == recordType {
+				existingRecords[i] = newRecord
+				found = true
+				break
+			}
+		}
+		if !found {
+			return errors.NewNotFound("DNS record", fmt.Sprintf("%s %s", hostname, recordType))
+		}
+		return s.SetRecords(ctx, domainName, existingRecords)
+	}
+
+	// Non-Atomic: Use granular update
 	// If the newRecord doesn't have ID, we try to find the existing record to get its ID,
 	// using the provided hostname and recordType (which define the record to be updated).
 	if newRecord.ID == "" {
@@ -96,6 +127,28 @@ func (s *Service) UpdateRecord(ctx context.Context, domainName string, hostname,
 
 // DeleteRecord removes a DNS record by hostname and type
 func (s *Service) DeleteRecord(ctx context.Context, domainName string, hostname, recordType string) error {
+	if s.provider.Capabilities().IsBulkReplaceAtomic {
+		// Atomic: Get -> Modify -> Set
+		existingRecords, err := s.GetRecords(ctx, domainName)
+		if err != nil {
+			return fmt.Errorf("failed to get existing records: %w", err)
+		}
+		var newRecords []dnsrecord.Record
+		found := false
+		for _, r := range existingRecords {
+			if r.HostName == hostname && r.RecordType == recordType {
+				found = true
+				continue
+			}
+			newRecords = append(newRecords, r)
+		}
+		if !found {
+			return errors.NewNotFound("DNS record", fmt.Sprintf("%s %s", hostname, recordType))
+		}
+		return s.SetRecords(ctx, domainName, newRecords)
+	}
+
+	// Non-Atomic: Use granular delete
 	record := dnsrecord.Record{
 		HostName:   hostname,
 		RecordType: recordType,

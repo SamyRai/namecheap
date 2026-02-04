@@ -25,14 +25,9 @@ This list identifies gaps, technical debt, and areas for improvement in the code
 
 ## 🧪 Medium Priority (Testing & QA)
 
-- [ ] **Expand Conformance Test Suite**
-  - **Issue**: `pkg/dns/provider/conformance` only tests `ListZones` and `GetZone`.
-  - **Task**: Add tests for:
-    - `CreateRecord`: Verify record is created and ID is returned.
-    - `UpdateRecord`: Verify record is updated.
-    - `DeleteRecord`: Verify record is gone.
-    - `ListRecords`: Verify filtering and pagination (if applicable).
-    - `BulkReplaceRecords`: Verify state transitions.
+- [x] **Expand Conformance Test Suite**
+  - **Issue**: `pkg/dns/provider/conformance` was missing.
+  - **Task**: Created `pkg/dns/provider/conformance` with a test suite covering `GetRecords`, `SetRecords`, `AddRecord`, `UpdateRecord`, and `DeleteRecord`. Added `MockProvider` for validating the suite.
 
 - [ ] **Add Integration Tests**
   - **Issue**: Tests primarily rely on mocks.

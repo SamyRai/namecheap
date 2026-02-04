@@ -293,11 +293,8 @@ func (s *ServiceTestSuite) TestService_AddRecord() {
 	// Verify record was added
 	records, err := s.service.GetRecords(s.ctx, domain)
 	s.Require().NoError(err)
-	// With Atomic=true (default mock), Service calls SetRecords, which overwrites or mock's SetRecords logic applies.
-	// But Service.AddRecord calls s.provider.AddRecord directly now!
-	// Wait, Service.AddRecord DOES call s.provider.AddRecord.
-	// My mock.AddRecord appends to m.records.
-	// So m.records should have 2 elements.
+	// With Atomic=true (default mock), Service calls SetRecords.
+	// We expect 2 records now.
 	s.Require().Len(records, 2)
 	s.Require().Contains(records, newRecord)
 }
@@ -321,6 +318,27 @@ func (s *ServiceTestSuite) TestService_UpdateRecord() {
 	s.Require().NoError(err)
 	s.Require().Len(records, 1)
 	s.Require().Equal(updatedRecord.Address, records[0].Address)
+}
+
+func (s *ServiceTestSuite) TestService_UpdateRecord_Rename() {
+	domain := testutil.ValidDomainFixture()
+
+	// Setup existing records
+	existingRecords := []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("old", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
+	}
+	s.mock.records[domain] = existingRecords
+
+	// Rename record
+	updatedRecord := convertDNSRecord(testutil.DNSRecordFixtureWithValues("new", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0))
+	err := s.service.UpdateRecord(s.ctx, domain, "old", dnsrecord.RecordTypeA, updatedRecord)
+	s.Require().NoError(err)
+
+	// Verify record was updated/renamed
+	records, err := s.service.GetRecords(s.ctx, domain)
+	s.Require().NoError(err)
+	s.Require().Len(records, 1)
+	s.Require().Equal("new", records[0].HostName)
 }
 
 func (s *ServiceTestSuite) TestService_UpdateRecord_NotFound() {
