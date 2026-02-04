@@ -98,6 +98,7 @@ components:
 **That's it!** The provider will be automatically discovered and registered on startup.
 
 No code needed - just the OpenAPI spec file. The auto-discovery system will:
+
 1. Scan `pkg/dns/provider/*/` directories
 2. Find `openapi.yaml` files
 3. Parse spec and generate provider config automatically
