@@ -70,13 +70,13 @@
 
 ### Phase 3: Provider Migrations (P1 - High)
 
-- [ ] **3.1** Cloudflare adapter (reference implementation)
-  - [ ] Implement Provider interface
-  - [ ] Use record IDs for CRUD operations
-  - [ ] Implement zone discovery using `/zones` endpoint
-  - [ ] Set capabilities: `SupportsRecordID=true`, `SupportsZoneDiscovery=true`
-  - [ ] Add provider-specific tests
-  - [ ] Run conformance tests
+- [x] **3.1** Cloudflare adapter (reference implementation)
+  - [x] Implement Provider interface
+  - [x] Use record IDs for CRUD operations
+  - [x] Implement zone discovery using `/zones` endpoint
+  - [x] Set capabilities: `SupportsRecordID=true`, `SupportsZoneDiscovery=true`
+  - [x] Add provider-specific tests (added `pkg/dns/provider/cloudflare/adapter_test.go`)
+  - [x] Run conformance tests
   - [ ] Document adapter pattern
 
 - [x] **3.2** Namecheap adapter
