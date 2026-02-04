@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -190,31 +191,31 @@ type dnsServiceWrapper struct {
 }
 
 func (w *dnsServiceWrapper) GetRecords(domainName string) ([]dnsrecord.Record, error) {
-	return w.service.GetRecords(domainName)
+	return w.service.GetRecords(context.Background(), domainName)
 }
 
 func (w *dnsServiceWrapper) GetRecordsByType(domainName string, recordType string) ([]dnsrecord.Record, error) {
-	return w.service.GetRecordsByType(domainName, recordType)
+	return w.service.GetRecordsByType(context.Background(), domainName, recordType)
 }
 
 func (w *dnsServiceWrapper) SetRecords(domainName string, records []dnsrecord.Record) error {
-	return w.service.SetRecords(domainName, records)
+	return w.service.SetRecords(context.Background(), domainName, records)
 }
 
 func (w *dnsServiceWrapper) AddRecord(domainName string, record dnsrecord.Record) error {
-	return w.service.AddRecord(domainName, record)
+	return w.service.AddRecord(context.Background(), domainName, record)
 }
 
 func (w *dnsServiceWrapper) UpdateRecord(domainName string, hostname, recordType string, newRecord dnsrecord.Record) error {
-	return w.service.UpdateRecord(domainName, hostname, recordType, newRecord)
+	return w.service.UpdateRecord(context.Background(), domainName, hostname, recordType, newRecord)
 }
 
 func (w *dnsServiceWrapper) DeleteRecord(domainName string, hostname, recordType string) error {
-	return w.service.DeleteRecord(domainName, hostname, recordType)
+	return w.service.DeleteRecord(context.Background(), domainName, hostname, recordType)
 }
 
 func (w *dnsServiceWrapper) DeleteAllRecords(domainName string) error {
-	return w.service.DeleteAllRecords(domainName)
+	return w.service.DeleteAllRecords(context.Background(), domainName)
 }
 
 func (w *dnsServiceWrapper) ValidateRecord(record dnsrecord.Record) error {
@@ -222,7 +223,7 @@ func (w *dnsServiceWrapper) ValidateRecord(record dnsrecord.Record) error {
 }
 
 func (w *dnsServiceWrapper) BulkUpdate(domainName string, operations []dns.BulkOperation) error {
-	return w.service.BulkUpdate(domainName, operations)
+	return w.service.BulkUpdate(context.Background(), domainName, operations)
 }
 
 func init() {

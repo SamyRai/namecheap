@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -27,18 +28,34 @@ func (m *mockProviderForRegistry) Name() string {
 	return m.name
 }
 
-func (m *mockProviderForRegistry) GetRecords(domainName string) ([]dnsrecord.Record, error) {
+func (m *mockProviderForRegistry) Capabilities() ProviderCapabilities {
+	return ProviderCapabilities{}
+}
+
+func (m *mockProviderForRegistry) GetRecords(ctx context.Context, domainName string) ([]dnsrecord.Record, error) {
 	if m.getRecordsError != nil {
 		return nil, m.getRecordsError
 	}
 	return m.records[domainName], nil
 }
 
-func (m *mockProviderForRegistry) SetRecords(domainName string, records []dnsrecord.Record) error {
+func (m *mockProviderForRegistry) SetRecords(ctx context.Context, domainName string, records []dnsrecord.Record) error {
 	if m.setRecordsError != nil {
 		return m.setRecordsError
 	}
 	m.records[domainName] = records
+	return nil
+}
+
+func (m *mockProviderForRegistry) AddRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
+	return nil
+}
+
+func (m *mockProviderForRegistry) UpdateRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
+	return nil
+}
+
+func (m *mockProviderForRegistry) DeleteRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
 	return nil
 }
 

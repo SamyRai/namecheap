@@ -55,9 +55,9 @@ var dnsListCmd = &cobra.Command{
 
 		var records []dnsrecord.Record
 		if recordType != "" {
-			records, err = dnsService.GetRecordsByType(domainName, strings.ToUpper(recordType))
+			records, err = dnsService.GetRecordsByType(cmd.Context(), domainName, strings.ToUpper(recordType))
 		} else {
-			records, err = dnsService.GetRecords(domainName)
+			records, err = dnsService.GetRecords(cmd.Context(), domainName)
 		}
 
 		if err != nil {
@@ -148,7 +148,7 @@ var dnsAddCmd = &cobra.Command{
 			return fmt.Errorf("invalid record: %w", err)
 		}
 
-		err = dnsService.AddRecord(domainName, record)
+		err = dnsService.AddRecord(cmd.Context(), domainName, record)
 		if err != nil {
 			return fmt.Errorf("failed to add DNS record: %w", err)
 		}
@@ -209,7 +209,7 @@ var dnsUpdateCmd = &cobra.Command{
 			return fmt.Errorf("invalid record: %w", err)
 		}
 
-		err = dnsService.UpdateRecord(domainName, hostname, recordType, newRecord)
+		err = dnsService.UpdateRecord(cmd.Context(), domainName, hostname, recordType, newRecord)
 		if err != nil {
 			return fmt.Errorf("failed to update DNS record: %w", err)
 		}
@@ -244,7 +244,7 @@ var dnsDeleteCmd = &cobra.Command{
 		cmdutil.DisplayAccountInfo(accountConfig)
 
 		dnsService := dns.NewService(client)
-		err = dnsService.DeleteRecord(domainName, hostname, recordType)
+		err = dnsService.DeleteRecord(cmd.Context(), domainName, hostname, recordType)
 		if err != nil {
 			return fmt.Errorf("failed to delete DNS record: %w", err)
 		}
@@ -288,7 +288,7 @@ var dnsClearCmd = &cobra.Command{
 		cmdutil.DisplayAccountInfo(accountConfig)
 
 		dnsService := dns.NewService(client)
-		err = dnsService.DeleteAllRecords(domainName)
+		err = dnsService.DeleteAllRecords(cmd.Context(), domainName)
 		if err != nil {
 			return fmt.Errorf("failed to clear DNS records: %w", err)
 		}
@@ -373,7 +373,7 @@ operations:
 		}
 
 		// Apply the operations
-		err = dnsService.BulkUpdate(domainName, operations)
+		err = dnsService.BulkUpdate(cmd.Context(), domainName, operations)
 		if err != nil {
 			return fmt.Errorf("failed to apply bulk operations: %w", err)
 		}
@@ -440,7 +440,7 @@ var dnsExportCmd = &cobra.Command{
 		cmdutil.DisplayAccountInfo(accountConfig)
 
 		dnsService := dns.NewService(client)
-		records, err := dnsService.GetRecords(domainName)
+		records, err := dnsService.GetRecords(cmd.Context(), domainName)
 		if err != nil {
 			return fmt.Errorf("failed to get DNS records: %w", err)
 		}

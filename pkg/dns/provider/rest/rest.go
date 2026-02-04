@@ -43,8 +43,16 @@ func (p *RESTProvider) Name() string {
 	return p.name
 }
 
+// Capabilities returns the provider capabilities
+func (p *RESTProvider) Capabilities() dnsprovider.ProviderCapabilities {
+	// For now, assume REST providers do NOT support atomic bulk replace
+	return dnsprovider.ProviderCapabilities{
+		IsBulkReplaceAtomic: false,
+	}
+}
+
 // GetRecords retrieves all DNS records for a domain
-func (p *RESTProvider) GetRecords(domainName string) ([]dnsrecord.Record, error) {
+func (p *RESTProvider) GetRecords(ctx context.Context, domainName string) ([]dnsrecord.Record, error) {
 	endpoint, ok := p.endpoints["get_records"]
 	if !ok {
 		return nil, fmt.Errorf("get_records endpoint not configured")
@@ -62,7 +70,6 @@ func (p *RESTProvider) GetRecords(domainName string) ([]dnsrecord.Record, error)
 		endpoint = strings.ReplaceAll(endpoint, "{zone_id}", zoneID)
 	}
 
-	ctx := context.Background()
 	resp, err := p.client.Get(ctx, endpoint, nil)
 	if err != nil {
 		return nil, errors.NewAPI("GetRecords", fmt.Sprintf("failed to get DNS records for %s", domainName), err)
@@ -94,18 +101,16 @@ func (p *RESTProvider) GetRecords(domainName string) ([]dnsrecord.Record, error)
 }
 
 // SetRecords sets DNS records for a domain (replaces all existing records)
-func (p *RESTProvider) SetRecords(domainName string, records []dnsrecord.Record) error {
+func (p *RESTProvider) SetRecords(ctx context.Context, domainName string, records []dnsrecord.Record) error {
 	// Most REST APIs don't support bulk replace, so we need to:
 	// 1. Get existing records
 	// 2. Delete all existing records
 	// 3. Create new records
 
-	existingRecords, err := p.GetRecords(domainName)
+	existingRecords, err := p.GetRecords(ctx, domainName)
 	if err != nil {
 		return fmt.Errorf("failed to get existing records: %w", err)
 	}
-
-	ctx := context.Background()
 
 	// Delete existing records
 	for _, record := range existingRecords {
@@ -123,6 +128,37 @@ func (p *RESTProvider) SetRecords(domainName string, records []dnsrecord.Record)
 	}
 
 	return nil
+}
+
+// AddRecord adds a single record
+func (p *RESTProvider) AddRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
+	return p.createRecord(ctx, domainName, record)
+}
+
+// UpdateRecord updates a single record
+func (p *RESTProvider) UpdateRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
+	// Check if update_record endpoint is available
+	_, hasUpdate := p.endpoints["update_record"]
+	if hasUpdate {
+		return p.updateRecordInternal(ctx, domainName, record)
+	}
+
+	// Fallback: Delete then Create
+	// Note: We need the ID for deletion. If record doesn't have ID, we might have issues deleting it if ID is required.
+	if err := p.deleteRecord(ctx, domainName, record); err != nil {
+		return fmt.Errorf("failed to delete existing record during update: %w", err)
+	}
+
+	if err := p.createRecord(ctx, domainName, record); err != nil {
+		return fmt.Errorf("failed to create new record during update: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteRecord deletes a single record
+func (p *RESTProvider) DeleteRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
+	return p.deleteRecord(ctx, domainName, record)
 }
 
 // createRecord creates a single DNS record
@@ -144,6 +180,40 @@ func (p *RESTProvider) createRecord(ctx context.Context, domainName string, reco
 	resp, err := p.client.Post(ctx, endpoint, body)
 	if err != nil {
 		return errors.NewAPI("CreateRecord", "failed to create DNS record", err)
+	}
+	defer resp.Body.Close()
+
+	return nil
+}
+
+// updateRecordInternal updates a single DNS record using the update endpoint
+func (p *RESTProvider) updateRecordInternal(ctx context.Context, domainName string, record dnsrecord.Record) error {
+	endpoint, ok := p.endpoints["update_record"]
+	if !ok {
+		return fmt.Errorf("update_record endpoint not configured")
+	}
+
+	endpoint = p.replacePlaceholders(endpoint, domainName)
+	zoneID, _ := p.getZoneID(domainName)
+	if zoneID != "" {
+		endpoint = strings.ReplaceAll(endpoint, "{zone_id}", zoneID)
+	}
+
+	// Replace {record_id} or {id} placeholders
+	if record.ID == "" {
+		return fmt.Errorf("update_record requires record_id - record is missing ID")
+	}
+	endpoint = strings.ReplaceAll(endpoint, "{record_id}", record.ID)
+	endpoint = strings.ReplaceAll(endpoint, "{id}", record.ID)
+	endpoint = strings.ReplaceAll(endpoint, "{recordId}", record.ID)
+
+	// Convert record to provider format
+	body := mapper.ToProviderFormat(record, p.mappings.Request)
+
+	// Use Put for update
+	resp, err := p.client.Put(ctx, endpoint, body)
+	if err != nil {
+		return errors.NewAPI("UpdateRecord", "failed to update DNS record", err)
 	}
 	defer resp.Body.Close()
 

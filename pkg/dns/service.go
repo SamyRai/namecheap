@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -49,48 +50,66 @@ func NewServiceWithProviderName(providerName string) (*Service, error) {
 }
 
 // GetRecords retrieves all DNS records for a domain
-func (s *Service) GetRecords(domainName string) ([]dnsrecord.Record, error) {
-	return s.provider.GetRecords(domainName)
+func (s *Service) GetRecords(ctx context.Context, domainName string) ([]dnsrecord.Record, error) {
+	return s.provider.GetRecords(ctx, domainName)
 }
 
 // SetRecords sets DNS records for a domain (replaces all existing records)
-func (s *Service) SetRecords(domainName string, records []dnsrecord.Record) error {
-	return s.provider.SetRecords(domainName, records)
+func (s *Service) SetRecords(ctx context.Context, domainName string, records []dnsrecord.Record) error {
+	return s.provider.SetRecords(ctx, domainName, records)
 }
 
 // AddRecord adds a single DNS record to a domain
-func (s *Service) AddRecord(domainName string, record dnsrecord.Record) error {
+func (s *Service) AddRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
 	// Validate record before adding
 	if err := s.ValidateRecord(record); err != nil {
 		return fmt.Errorf("invalid record: %w", err)
 	}
 
-	// Get existing records
-	existingRecords, err := s.GetRecords(domainName)
-	if err != nil {
-		return fmt.Errorf("failed to get existing records: %w", err)
-	}
-
-	// Add new record
-	allRecords := append(existingRecords, record)
-
-	// Set all records
-	return s.SetRecords(domainName, allRecords)
+	return s.provider.AddRecord(ctx, domainName, record)
 }
 
 // UpdateRecord updates a DNS record by hostname and type
-func (s *Service) UpdateRecord(domainName string, hostname, recordType string, newRecord dnsrecord.Record) error {
-	// Get existing records
-	existingRecords, err := s.GetRecords(domainName)
-	if err != nil {
-		return fmt.Errorf("failed to get existing records: %w", err)
+func (s *Service) UpdateRecord(ctx context.Context, domainName string, hostname, recordType string, newRecord dnsrecord.Record) error {
+	// If the newRecord doesn't have ID, we try to find the existing record to get its ID,
+	// using the provided hostname and recordType (which define the record to be updated).
+	if newRecord.ID == "" {
+		existingRecords, err := s.GetRecords(ctx, domainName)
+		if err != nil {
+			return fmt.Errorf("failed to get existing records to find ID: %w", err)
+		}
+		found := false
+		for _, r := range existingRecords {
+			if r.HostName == hostname && r.RecordType == recordType {
+				newRecord.ID = r.ID
+				found = true
+				break
+			}
+		}
+		if !found {
+			return errors.NewNotFound("DNS record", fmt.Sprintf("%s %s", hostname, recordType))
+		}
 	}
 
-	// Find and update the record
+	return s.provider.UpdateRecord(ctx, domainName, newRecord)
+}
+
+// DeleteRecord removes a DNS record by hostname and type
+func (s *Service) DeleteRecord(ctx context.Context, domainName string, hostname, recordType string) error {
+	record := dnsrecord.Record{
+		HostName:   hostname,
+		RecordType: recordType,
+	}
+
+	// Try to get ID if missing, as REST providers might need it
+	existingRecords, err := s.GetRecords(ctx, domainName)
+	if err != nil {
+		return fmt.Errorf("failed to get existing records to find ID: %w", err)
+	}
 	found := false
-	for i, record := range existingRecords {
-		if record.HostName == hostname && record.RecordType == recordType {
-			existingRecords[i] = newRecord
+	for _, r := range existingRecords {
+		if r.HostName == hostname && r.RecordType == recordType {
+			record.ID = r.ID
 			found = true
 			break
 		}
@@ -100,45 +119,17 @@ func (s *Service) UpdateRecord(domainName string, hostname, recordType string, n
 		return errors.NewNotFound("DNS record", fmt.Sprintf("%s %s", hostname, recordType))
 	}
 
-	// Set all records
-	return s.SetRecords(domainName, existingRecords)
-}
-
-// DeleteRecord removes a DNS record by hostname and type
-func (s *Service) DeleteRecord(domainName string, hostname, recordType string) error {
-	// Get existing records
-	existingRecords, err := s.GetRecords(domainName)
-	if err != nil {
-		return fmt.Errorf("failed to get existing records: %w", err)
-	}
-
-	// Filter out the record to delete
-	var filteredRecords []dnsrecord.Record
-	found := false
-	for _, record := range existingRecords {
-		if record.HostName == hostname && record.RecordType == recordType {
-			found = true
-			continue
-		}
-		filteredRecords = append(filteredRecords, record)
-	}
-
-	if !found {
-		return errors.NewNotFound("DNS record", fmt.Sprintf("%s %s", hostname, recordType))
-	}
-
-	// Set remaining records
-	return s.SetRecords(domainName, filteredRecords)
+	return s.provider.DeleteRecord(ctx, domainName, record)
 }
 
 // DeleteAllRecords removes all DNS records for a domain
-func (s *Service) DeleteAllRecords(domainName string) error {
-	return s.SetRecords(domainName, []dnsrecord.Record{})
+func (s *Service) DeleteAllRecords(ctx context.Context, domainName string) error {
+	return s.SetRecords(ctx, domainName, []dnsrecord.Record{})
 }
 
 // GetRecordsByType filters records by type
-func (s *Service) GetRecordsByType(domainName string, recordType string) ([]dnsrecord.Record, error) {
-	allRecords, err := s.GetRecords(domainName)
+func (s *Service) GetRecordsByType(ctx context.Context, domainName string, recordType string) ([]dnsrecord.Record, error) {
+	allRecords, err := s.GetRecords(ctx, domainName)
 	if err != nil {
 		return nil, err
 	}
@@ -241,63 +232,95 @@ type BulkOperation struct {
 }
 
 // BulkUpdate performs multiple DNS operations in a single API call
-func (s *Service) BulkUpdate(domainName string, operations []BulkOperation) error {
-	// Get existing records
-	existingRecords, err := s.GetRecords(domainName)
-	if err != nil {
-		return fmt.Errorf("failed to get existing records: %w", err)
-	}
-
-	records := make([]dnsrecord.Record, len(existingRecords))
-	copy(records, existingRecords)
-
-	// Apply operations
-	for _, op := range operations {
-		switch op.Action {
-		case BulkActionAdd:
-			if err := s.ValidateRecord(op.Record); err != nil {
-				return fmt.Errorf("invalid record for add operation: %w", err)
-			}
-			records = append(records, op.Record)
-
-		case BulkActionUpdate:
-			if err := s.ValidateRecord(op.Record); err != nil {
-				return fmt.Errorf("invalid record for update operation: %w", err)
-			}
-			found := false
-			for i, record := range records {
-				if record.HostName == op.Record.HostName && record.RecordType == op.Record.RecordType {
-					records[i] = op.Record
-					found = true
-					break
-				}
-			}
-			if !found {
-				return fmt.Errorf("record not found for update: %s %s", op.Record.HostName, op.Record.RecordType)
-			}
-
-		case BulkActionDelete:
-			var filteredRecords []dnsrecord.Record
-			found := false
-			for _, record := range records {
-				if record.HostName == op.Record.HostName && record.RecordType == op.Record.RecordType {
-					found = true
-					continue
-				}
-				filteredRecords = append(filteredRecords, record)
-			}
-			if !found {
-				return errors.NewNotFound("DNS record", fmt.Sprintf("%s %s", op.Record.HostName, op.Record.RecordType))
-			}
-			records = filteredRecords
-
-		default:
-			return errors.NewInvalidInput("action", fmt.Sprintf("invalid bulk operation action: %s (must be one of: %s, %s, %s)", op.Action, BulkActionAdd, BulkActionUpdate, BulkActionDelete))
+func (s *Service) BulkUpdate(ctx context.Context, domainName string, operations []BulkOperation) error {
+	// Check provider capabilities
+	if s.provider.Capabilities().IsBulkReplaceAtomic {
+		// Atomic Bulk Replace: Use original logic (Get -> Modify -> SetAll)
+		existingRecords, err := s.GetRecords(ctx, domainName)
+		if err != nil {
+			return fmt.Errorf("failed to get existing records: %w", err)
 		}
-	}
 
-	// Set all records
-	return s.SetRecords(domainName, records)
+		records := make([]dnsrecord.Record, len(existingRecords))
+		copy(records, existingRecords)
+
+		// Apply operations in memory
+		for _, op := range operations {
+			switch op.Action {
+			case BulkActionAdd:
+				if err := s.ValidateRecord(op.Record); err != nil {
+					return fmt.Errorf("invalid record for add operation: %w", err)
+				}
+				records = append(records, op.Record)
+
+			case BulkActionUpdate:
+				if err := s.ValidateRecord(op.Record); err != nil {
+					return fmt.Errorf("invalid record for update operation: %w", err)
+				}
+				found := false
+				for i, record := range records {
+					if record.HostName == op.Record.HostName && record.RecordType == op.Record.RecordType {
+						records[i] = op.Record
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("record not found for update: %s %s", op.Record.HostName, op.Record.RecordType)
+				}
+
+			case BulkActionDelete:
+				var filteredRecords []dnsrecord.Record
+				found := false
+				for _, record := range records {
+					if record.HostName == op.Record.HostName && record.RecordType == op.Record.RecordType {
+						found = true
+						continue
+					}
+					filteredRecords = append(filteredRecords, record)
+				}
+				if !found {
+					return errors.NewNotFound("DNS record", fmt.Sprintf("%s %s", op.Record.HostName, op.Record.RecordType))
+				}
+				records = filteredRecords
+
+			default:
+				return errors.NewInvalidInput("action", fmt.Sprintf("invalid bulk operation action: %s (must be one of: %s, %s, %s)", op.Action, BulkActionAdd, BulkActionUpdate, BulkActionDelete))
+			}
+		}
+
+		// Set all records
+		return s.SetRecords(ctx, domainName, records)
+
+	} else {
+		// Non-Atomic: Execute granular operations
+		for _, op := range operations {
+			var err error
+			switch op.Action {
+			case BulkActionAdd:
+				if err = s.ValidateRecord(op.Record); err != nil {
+					return err
+				}
+				err = s.AddRecord(ctx, domainName, op.Record)
+			case BulkActionUpdate:
+				if err = s.ValidateRecord(op.Record); err != nil {
+					return err
+				}
+				// Use the record from operation for both key and value
+				err = s.UpdateRecord(ctx, domainName, op.Record.HostName, op.Record.RecordType, op.Record)
+			case BulkActionDelete:
+				err = s.DeleteRecord(ctx, domainName, op.Record.HostName, op.Record.RecordType)
+			default:
+				return errors.NewInvalidInput("action", fmt.Sprintf("invalid bulk operation action: %s", op.Action))
+			}
+
+			if err != nil {
+				// TODO: Implement rollback attempt?
+				return fmt.Errorf("bulk operation failed at action %s for %s: %w", op.Action, op.Record.HostName, err)
+			}
+		}
+		return nil
+	}
 }
 
 func parseDomain(fullDomain string) (string, string) {

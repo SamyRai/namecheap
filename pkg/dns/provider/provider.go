@@ -1,19 +1,38 @@
 package provider
 
 import (
+	"context"
 	"zonekit/pkg/dnsrecord"
 )
+
+// ProviderCapabilities defines the capabilities of a DNS provider
+type ProviderCapabilities struct {
+	// IsBulkReplaceAtomic indicates if the provider supports atomic bulk replacement of records
+	IsBulkReplaceAtomic bool
+}
 
 // Provider defines the interface that all DNS providers must implement
 type Provider interface {
 	// Name returns the provider name (e.g., "namecheap", "cloudflare", "godaddy")
 	Name() string
 
+	// Capabilities returns the provider capabilities
+	Capabilities() ProviderCapabilities
+
 	// GetRecords retrieves all DNS records for a domain
-	GetRecords(domainName string) ([]dnsrecord.Record, error)
+	GetRecords(ctx context.Context, domainName string) ([]dnsrecord.Record, error)
 
 	// SetRecords sets DNS records for a domain (replaces all existing records)
-	SetRecords(domainName string, records []dnsrecord.Record) error
+	SetRecords(ctx context.Context, domainName string, records []dnsrecord.Record) error
+
+	// AddRecord adds a single record
+	AddRecord(ctx context.Context, domainName string, record dnsrecord.Record) error
+
+	// UpdateRecord updates a single record
+	UpdateRecord(ctx context.Context, domainName string, record dnsrecord.Record) error
+
+	// DeleteRecord deletes a single record
+	DeleteRecord(ctx context.Context, domainName string, record dnsrecord.Record) error
 
 	// Validate checks if the provider is properly configured
 	Validate() error

@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -17,12 +18,14 @@ type mockProvider struct {
 	getRecordsError error
 	setRecordsError error
 	validateError   error
+	isAtomic        bool
 }
 
 func newMockProvider(name string) *mockProvider {
 	return &mockProvider{
-		name:    name,
-		records: make(map[string][]dnsrecord.Record),
+		name:     name,
+		records:  make(map[string][]dnsrecord.Record),
+		isAtomic: true,
 	}
 }
 
@@ -30,18 +33,64 @@ func (m *mockProvider) Name() string {
 	return m.name
 }
 
-func (m *mockProvider) GetRecords(domainName string) ([]dnsrecord.Record, error) {
+func (m *mockProvider) Capabilities() provider.ProviderCapabilities {
+	return provider.ProviderCapabilities{
+		IsBulkReplaceAtomic: m.isAtomic,
+	}
+}
+
+func (m *mockProvider) GetRecords(ctx context.Context, domainName string) ([]dnsrecord.Record, error) {
 	if m.getRecordsError != nil {
 		return nil, m.getRecordsError
 	}
 	return m.records[domainName], nil
 }
 
-func (m *mockProvider) SetRecords(domainName string, records []dnsrecord.Record) error {
+func (m *mockProvider) SetRecords(ctx context.Context, domainName string, records []dnsrecord.Record) error {
 	if m.setRecordsError != nil {
 		return m.setRecordsError
 	}
 	m.records[domainName] = records
+	return nil
+}
+
+func (m *mockProvider) AddRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
+	m.records[domainName] = append(m.records[domainName], record)
+	return nil
+}
+
+func (m *mockProvider) UpdateRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
+	records := m.records[domainName]
+	found := false
+	for i, r := range records {
+		if r.HostName == record.HostName && r.RecordType == record.RecordType {
+			records[i] = record
+			found = true
+			break
+		}
+	}
+	if !found {
+		return errors.New("record not found")
+	}
+	m.records[domainName] = records
+	return nil
+}
+
+func (m *mockProvider) DeleteRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
+	records := m.records[domainName]
+	var newRecords []dnsrecord.Record
+	found := false
+	for _, r := range records {
+		if r.HostName == record.HostName && r.RecordType == record.RecordType {
+			found = true
+			continue
+		}
+		newRecords = append(newRecords, r)
+	}
+	if !found {
+		return errors.New("record not found")
+	}
+	m.records[domainName] = newRecords
 	return nil
 }
 
@@ -54,6 +103,7 @@ type ServiceTestSuite struct {
 	suite.Suite
 	service *Service
 	mock    *mockProvider
+	ctx     context.Context
 }
 
 // TestServiceSuite runs the DNS service test suite
@@ -64,6 +114,7 @@ func TestServiceSuite(t *testing.T) {
 func (s *ServiceTestSuite) SetupTest() {
 	s.mock = newMockProvider("mock")
 	s.service = NewServiceWithProvider(s.mock)
+	s.ctx = context.Background()
 }
 
 func (s *ServiceTestSuite) TestService_ValidateRecord_ValidRecords() {
@@ -183,7 +234,7 @@ func (s *ServiceTestSuite) TestService_GetRecords() {
 	s.mock.records[domain] = mockRecords
 
 	// Test GetRecords
-	records, err := s.service.GetRecords(domain)
+	records, err := s.service.GetRecords(s.ctx, domain)
 	s.Require().NoError(err)
 	s.Require().Len(records, 2)
 	s.Require().Equal(mockRecords, records)
@@ -194,7 +245,7 @@ func (s *ServiceTestSuite) TestService_GetRecords_Error() {
 	expectedError := errors.New("provider error")
 	s.mock.getRecordsError = expectedError
 
-	records, err := s.service.GetRecords(domain)
+	records, err := s.service.GetRecords(s.ctx, domain)
 	s.Require().Error(err)
 	s.Require().Equal(expectedError, err)
 	s.Require().Nil(records)
@@ -206,7 +257,7 @@ func (s *ServiceTestSuite) TestService_SetRecords() {
 		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
 	}
 
-	err := s.service.SetRecords(domain, records)
+	err := s.service.SetRecords(s.ctx, domain, records)
 	s.Require().NoError(err)
 	s.Require().Equal(records, s.mock.records[domain])
 }
@@ -220,7 +271,7 @@ func (s *ServiceTestSuite) TestService_SetRecords_Error() {
 		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
 	}
 
-	err := s.service.SetRecords(domain, records)
+	err := s.service.SetRecords(s.ctx, domain, records)
 	s.Require().Error(err)
 	s.Require().Equal(expectedError, err)
 }
@@ -236,12 +287,17 @@ func (s *ServiceTestSuite) TestService_AddRecord() {
 
 	// Add new record
 	newRecord := convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.2", 1800, 0))
-	err := s.service.AddRecord(domain, newRecord)
+	err := s.service.AddRecord(s.ctx, domain, newRecord)
 	s.Require().NoError(err)
 
 	// Verify record was added
-	records, err := s.service.GetRecords(domain)
+	records, err := s.service.GetRecords(s.ctx, domain)
 	s.Require().NoError(err)
+	// With Atomic=true (default mock), Service calls SetRecords, which overwrites or mock's SetRecords logic applies.
+	// But Service.AddRecord calls s.provider.AddRecord directly now!
+	// Wait, Service.AddRecord DOES call s.provider.AddRecord.
+	// My mock.AddRecord appends to m.records.
+	// So m.records should have 2 elements.
 	s.Require().Len(records, 2)
 	s.Require().Contains(records, newRecord)
 }
@@ -257,11 +313,11 @@ func (s *ServiceTestSuite) TestService_UpdateRecord() {
 
 	// Update record
 	updatedRecord := convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.100", 3600, 0))
-	err := s.service.UpdateRecord(domain, "@", dnsrecord.RecordTypeA, updatedRecord)
+	err := s.service.UpdateRecord(s.ctx, domain, "@", dnsrecord.RecordTypeA, updatedRecord)
 	s.Require().NoError(err)
 
 	// Verify record was updated
-	records, err := s.service.GetRecords(domain)
+	records, err := s.service.GetRecords(s.ctx, domain)
 	s.Require().NoError(err)
 	s.Require().Len(records, 1)
 	s.Require().Equal(updatedRecord.Address, records[0].Address)
@@ -278,7 +334,7 @@ func (s *ServiceTestSuite) TestService_UpdateRecord_NotFound() {
 
 	// Try to update non-existent record
 	updatedRecord := convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.2", 1800, 0))
-	err := s.service.UpdateRecord(domain, "www", dnsrecord.RecordTypeA, updatedRecord)
+	err := s.service.UpdateRecord(s.ctx, domain, "www", dnsrecord.RecordTypeA, updatedRecord)
 	s.Require().Error(err)
 }
 
@@ -293,11 +349,11 @@ func (s *ServiceTestSuite) TestService_DeleteRecord() {
 	s.mock.records[domain] = existingRecords
 
 	// Delete record
-	err := s.service.DeleteRecord(domain, "@", dnsrecord.RecordTypeA)
+	err := s.service.DeleteRecord(s.ctx, domain, "@", dnsrecord.RecordTypeA)
 	s.Require().NoError(err)
 
 	// Verify record was deleted
-	records, err := s.service.GetRecords(domain)
+	records, err := s.service.GetRecords(s.ctx, domain)
 	s.Require().NoError(err)
 	s.Require().Len(records, 1)
 	s.Require().Equal("www", records[0].HostName)
@@ -313,7 +369,7 @@ func (s *ServiceTestSuite) TestService_DeleteRecord_NotFound() {
 	s.mock.records[domain] = existingRecords
 
 	// Try to delete non-existent record
-	err := s.service.DeleteRecord(domain, "www", dnsrecord.RecordTypeA)
+	err := s.service.DeleteRecord(s.ctx, domain, "www", dnsrecord.RecordTypeA)
 	s.Require().Error(err)
 }
 
@@ -328,11 +384,11 @@ func (s *ServiceTestSuite) TestService_DeleteAllRecords() {
 	s.mock.records[domain] = existingRecords
 
 	// Delete all records
-	err := s.service.DeleteAllRecords(domain)
+	err := s.service.DeleteAllRecords(s.ctx, domain)
 	s.Require().NoError(err)
 
 	// Verify all records were deleted
-	records, err := s.service.GetRecords(domain)
+	records, err := s.service.GetRecords(s.ctx, domain)
 	s.Require().NoError(err)
 	s.Require().Empty(records)
 }
@@ -349,13 +405,13 @@ func (s *ServiceTestSuite) TestService_GetRecordsByType() {
 	s.mock.records[domain] = mockRecords
 
 	// Test GetRecordsByType
-	aRecords, err := s.service.GetRecordsByType(domain, dnsrecord.RecordTypeA)
+	aRecords, err := s.service.GetRecordsByType(s.ctx, domain, dnsrecord.RecordTypeA)
 	s.Require().NoError(err)
 	s.Require().Len(aRecords, 2)
 	s.Require().Equal(dnsrecord.RecordTypeA, aRecords[0].RecordType)
 	s.Require().Equal(dnsrecord.RecordTypeA, aRecords[1].RecordType)
 
-	mxRecords, err := s.service.GetRecordsByType(domain, dnsrecord.RecordTypeMX)
+	mxRecords, err := s.service.GetRecordsByType(s.ctx, domain, dnsrecord.RecordTypeMX)
 	s.Require().NoError(err)
 	s.Require().Len(mxRecords, 1)
 	s.Require().Equal(dnsrecord.RecordTypeMX, mxRecords[0].RecordType)
@@ -382,13 +438,83 @@ func (s *ServiceTestSuite) TestService_BulkUpdate_Add() {
 		},
 	}
 
-	err := s.service.BulkUpdate(domain, operations)
+	err := s.service.BulkUpdate(s.ctx, domain, operations)
 	s.Require().NoError(err)
 
 	// Verify records were added
-	records, err := s.service.GetRecords(domain)
+	records, err := s.service.GetRecords(s.ctx, domain)
 	s.Require().NoError(err)
 	s.Require().Len(records, 3)
+}
+
+func (s *ServiceTestSuite) TestService_BulkUpdate_NonAtomic() {
+	// Configure mock to be non-atomic
+	s.mock.isAtomic = false
+
+	domain := testutil.ValidDomainFixture()
+
+	// Setup existing records
+	existingRecords := []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.2", 1800, 0)),
+	}
+	s.mock.records[domain] = existingRecords
+
+	// Mixed operations: add, update, delete
+	operations := []BulkOperation{
+		{
+			Action: BulkActionAdd,
+			Record: convertDNSRecord(testutil.DNSRecordFixtureWithValues("mail", dnsrecord.RecordTypeA, "192.168.1.3", 1800, 0)),
+		},
+		{
+			Action: BulkActionUpdate,
+			Record: convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.100", 3600, 0)),
+		},
+		{
+			Action: BulkActionDelete,
+			Record: convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.2", 1800, 0)),
+		},
+	}
+
+	err := s.service.BulkUpdate(s.ctx, domain, operations)
+	s.Require().NoError(err)
+
+	// Verify final state
+	records, err := s.service.GetRecords(s.ctx, domain)
+	s.Require().NoError(err)
+	s.Require().Len(records, 2)
+
+	// Check that @ was updated
+	var rootRecord *dnsrecord.Record
+	for i := range records {
+		if records[i].HostName == "@" {
+			rootRecord = &records[i]
+			break
+		}
+	}
+	s.Require().NotNil(rootRecord)
+	s.Require().Equal("192.168.1.100", rootRecord.Address)
+
+	// Check that mail was added
+	var mailRecord *dnsrecord.Record
+	for i := range records {
+		if records[i].HostName == "mail" {
+			mailRecord = &records[i]
+			break
+		}
+	}
+	s.Require().NotNil(mailRecord)
+	s.Require().Equal("192.168.1.3", mailRecord.Address)
+
+	// Check that www was deleted
+	var wwwRecord *dnsrecord.Record
+	for i := range records {
+		if records[i].HostName == "www" {
+			wwwRecord = &records[i]
+			break
+		}
+	}
+	s.Require().Nil(wwwRecord)
 }
 
 func (s *ServiceTestSuite) TestService_BulkUpdate_Update() {
@@ -413,11 +539,11 @@ func (s *ServiceTestSuite) TestService_BulkUpdate_Update() {
 		},
 	}
 
-	err := s.service.BulkUpdate(domain, operations)
+	err := s.service.BulkUpdate(s.ctx, domain, operations)
 	s.Require().NoError(err)
 
 	// Verify records were updated
-	records, err := s.service.GetRecords(domain)
+	records, err := s.service.GetRecords(s.ctx, domain)
 	s.Require().NoError(err)
 	s.Require().Len(records, 2)
 	s.Require().Equal("192.168.1.100", records[0].Address)
@@ -447,11 +573,11 @@ func (s *ServiceTestSuite) TestService_BulkUpdate_Delete() {
 		},
 	}
 
-	err := s.service.BulkUpdate(domain, operations)
+	err := s.service.BulkUpdate(s.ctx, domain, operations)
 	s.Require().NoError(err)
 
 	// Verify records were deleted
-	records, err := s.service.GetRecords(domain)
+	records, err := s.service.GetRecords(s.ctx, domain)
 	s.Require().NoError(err)
 	s.Require().Len(records, 1)
 	s.Require().Equal("mail", records[0].HostName)
@@ -483,11 +609,11 @@ func (s *ServiceTestSuite) TestService_BulkUpdate_MixedOperations() {
 		},
 	}
 
-	err := s.service.BulkUpdate(domain, operations)
+	err := s.service.BulkUpdate(s.ctx, domain, operations)
 	s.Require().NoError(err)
 
 	// Verify final state
-	records, err := s.service.GetRecords(domain)
+	records, err := s.service.GetRecords(s.ctx, domain)
 	s.Require().NoError(err)
 	s.Require().Len(records, 2)
 
@@ -524,7 +650,7 @@ func (s *ServiceTestSuite) TestService_BulkUpdate_InvalidAction() {
 		},
 	}
 
-	err := s.service.BulkUpdate(domain, operations)
+	err := s.service.BulkUpdate(s.ctx, domain, operations)
 	s.Require().Error(err)
 }
 
@@ -538,7 +664,7 @@ func (s *ServiceTestSuite) TestService_BulkUpdate_InvalidRecord() {
 		},
 	}
 
-	err := s.service.BulkUpdate(domain, operations)
+	err := s.service.BulkUpdate(s.ctx, domain, operations)
 	s.Require().Error(err)
 }
 
@@ -559,7 +685,7 @@ func (s *ServiceTestSuite) TestService_BulkUpdate_UpdateNotFound() {
 		},
 	}
 
-	err := s.service.BulkUpdate(domain, operations)
+	err := s.service.BulkUpdate(s.ctx, domain, operations)
 	s.Require().Error(err)
 }
 
@@ -580,7 +706,7 @@ func (s *ServiceTestSuite) TestService_BulkUpdate_DeleteNotFound() {
 		},
 	}
 
-	err := s.service.BulkUpdate(domain, operations)
+	err := s.service.BulkUpdate(s.ctx, domain, operations)
 	s.Require().Error(err)
 }
 
@@ -596,7 +722,7 @@ func (s *ServiceTestSuite) TestService_BulkUpdate_GetRecordsError() {
 		},
 	}
 
-	err := s.service.BulkUpdate(domain, operations)
+	err := s.service.BulkUpdate(s.ctx, domain, operations)
 	s.Require().Error(err)
 	// BulkUpdate wraps the error, so check that it contains the original error
 	s.Require().Contains(err.Error(), "failed to get existing records")
@@ -622,7 +748,7 @@ func (s *ServiceTestSuite) TestService_BulkUpdate_SetRecordsError() {
 		},
 	}
 
-	err := s.service.BulkUpdate(domain, operations)
+	err := s.service.BulkUpdate(s.ctx, domain, operations)
 	s.Require().Error(err)
 	s.Require().Equal(expectedError, err)
 }
@@ -632,7 +758,7 @@ func (s *ServiceTestSuite) TestService_AddRecord_ValidationError() {
 
 	// Try to add invalid record (empty hostname)
 	invalidRecord := convertDNSRecord(testutil.DNSRecordFixtureWithValues("", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0))
-	err := s.service.AddRecord(domain, invalidRecord)
+	err := s.service.AddRecord(s.ctx, domain, invalidRecord)
 	s.Require().Error(err)
 	s.Require().Contains(err.Error(), "invalid record")
 }

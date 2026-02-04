@@ -1,6 +1,7 @@
 package namecheap
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/namecheap/go-namecheap-sdk/v2/namecheap"
@@ -28,8 +29,16 @@ func (p *NamecheapProvider) Name() string {
 	return "namecheap"
 }
 
+// Capabilities returns the provider capabilities
+func (p *NamecheapProvider) Capabilities() dnsprovider.ProviderCapabilities {
+	return dnsprovider.ProviderCapabilities{
+		IsBulkReplaceAtomic: true,
+	}
+}
+
 // GetRecords retrieves all DNS records for a domain
-func (p *NamecheapProvider) GetRecords(domainName string) ([]dnsrecord.Record, error) {
+func (p *NamecheapProvider) GetRecords(ctx context.Context, domainName string) ([]dnsrecord.Record, error) {
+	// The SDK doesn't support context yet, so we ignore it
 	nc := p.client.GetNamecheapClient()
 
 	resp, err := nc.DomainsDNS.GetHosts(domainName)
@@ -58,7 +67,7 @@ func (p *NamecheapProvider) GetRecords(domainName string) ([]dnsrecord.Record, e
 }
 
 // SetRecords sets DNS records for a domain (replaces all existing records)
-func (p *NamecheapProvider) SetRecords(domainName string, records []dnsrecord.Record) error {
+func (p *NamecheapProvider) SetRecords(ctx context.Context, domainName string, records []dnsrecord.Record) error {
 	nc := p.client.GetNamecheapClient()
 
 	// Convert records to Namecheap format
@@ -105,6 +114,63 @@ func (p *NamecheapProvider) SetRecords(domainName string, records []dnsrecord.Re
 	}
 
 	return nil
+}
+
+// AddRecord adds a single record
+func (p *NamecheapProvider) AddRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
+	existingRecords, err := p.GetRecords(ctx, domainName)
+	if err != nil {
+		return err
+	}
+	existingRecords = append(existingRecords, record)
+	return p.SetRecords(ctx, domainName, existingRecords)
+}
+
+// UpdateRecord updates a single record
+func (p *NamecheapProvider) UpdateRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
+	existingRecords, err := p.GetRecords(ctx, domainName)
+	if err != nil {
+		return err
+	}
+
+	found := false
+	for i, r := range existingRecords {
+		if r.HostName == record.HostName && r.RecordType == record.RecordType {
+			existingRecords[i] = record
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return errors.NewNotFound("DNS record", fmt.Sprintf("%s %s", record.HostName, record.RecordType))
+	}
+
+	return p.SetRecords(ctx, domainName, existingRecords)
+}
+
+// DeleteRecord deletes a single record
+func (p *NamecheapProvider) DeleteRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
+	existingRecords, err := p.GetRecords(ctx, domainName)
+	if err != nil {
+		return err
+	}
+
+	var newRecords []dnsrecord.Record
+	found := false
+	for _, r := range existingRecords {
+		if r.HostName == record.HostName && r.RecordType == record.RecordType {
+			found = true
+			continue
+		}
+		newRecords = append(newRecords, r)
+	}
+
+	if !found {
+		return errors.NewNotFound("DNS record", fmt.Sprintf("%s %s", record.HostName, record.RecordType))
+	}
+
+	return p.SetRecords(ctx, domainName, newRecords)
 }
 
 // Validate checks if the provider is properly configured
