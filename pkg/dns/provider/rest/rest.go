@@ -43,6 +43,11 @@ func (p *RESTProvider) Name() string {
 	return p.name
 }
 
+// Mappings returns the provider mappings
+func (p *RESTProvider) Mappings() mapper.Mappings {
+	return p.mappings
+}
+
 // Capabilities returns the provider capabilities
 func (p *RESTProvider) Capabilities() dnsprovider.ProviderCapabilities {
 	// We assume REST providers support Record ID if mappings include ID

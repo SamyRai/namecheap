@@ -6,6 +6,9 @@ import (
 
 	dnsprovider "zonekit/pkg/dns/provider"
 	"zonekit/pkg/dns/provider/auth"
+	"zonekit/pkg/dns/provider/cloudflare"
+	"zonekit/pkg/dns/provider/digitalocean"
+	"zonekit/pkg/dns/provider/godaddy"
 	httpprovider "zonekit/pkg/dns/provider/http"
 	"zonekit/pkg/dns/provider/mapper"
 	"zonekit/pkg/dns/provider/rest"
@@ -61,6 +64,16 @@ func BuildProvider(config *dnsprovider.Config) (dnsprovider.Provider, error) {
 
 // buildRESTProvider creates a REST-based provider
 func buildRESTProvider(config *dnsprovider.Config, client *httpprovider.Client) (dnsprovider.Provider, error) {
+	// Check for specialized adapters
+	switch config.Name {
+	case "cloudflare":
+		return cloudflare.New(client), nil
+	case "digitalocean":
+		return digitalocean.New(client), nil
+	case "godaddy":
+		return godaddy.New(client), nil
+	}
+
 	// Build mappings
 	mappings := buildMappings(config.Mappings)
 

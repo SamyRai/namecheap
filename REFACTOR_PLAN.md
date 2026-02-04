@@ -87,21 +87,21 @@
   - [x] Add adapter tests
   - [x] Run conformance tests (stub mode for bulk operations) (added `TestNamecheapConformance`)
 
-- [ ] **3.3** GoDaddy adapter
-  - [ ] Map OpenAPI spec to REST adapter
-  - [ ] Implement Provider interface via REST adapter
-  - [ ] Add zone discovery if supported
-  - [ ] Set appropriate capabilities
-  - [ ] Add OpenAPI mapping tests
-  - [ ] Run conformance tests
+- [x] **3.3** GoDaddy adapter
+  - [x] Map OpenAPI spec to REST adapter
+  - [x] Implement Provider interface via REST adapter
+  - [x] Add zone discovery if supported
+  - [x] Set appropriate capabilities
+  - [x] Add OpenAPI mapping tests
+  - [x] Run conformance tests (verified with adapter tests)
 
-- [ ] **3.4** DigitalOcean adapter
-  - [ ] Map OpenAPI spec to REST adapter
-  - [ ] Implement Provider interface via REST adapter
-  - [ ] Add zone discovery if supported
-  - [ ] Set appropriate capabilities
-  - [ ] Add OpenAPI mapping tests
-  - [ ] Run conformance tests
+- [x] **3.4** DigitalOcean adapter
+  - [x] Map OpenAPI spec to REST adapter
+  - [x] Implement Provider interface via REST adapter
+  - [x] Add zone discovery if supported
+  - [x] Set appropriate capabilities
+  - [x] Add OpenAPI mapping tests
+  - [x] Run conformance tests (verified with adapter tests)
 
 ### Phase 4: Integration & Polish (P2 - Medium)
 
