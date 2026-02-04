@@ -4,12 +4,14 @@ import (
 	"context"
 	"testing"
 
+	dnsprovider "zonekit/pkg/dns/provider"
+	conformance "zonekit/pkg/dns/provider/conformance"
+	"zonekit/pkg/dnsrecord"
+
 	"github.com/namecheap/go-namecheap-sdk/v2/namecheap"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	dnsprovider "zonekit/pkg/dns/provider"
-	"zonekit/pkg/dnsrecord"
 )
 
 // MockNamecheapClient is a mock implementation of NamecheapClient
@@ -101,10 +103,10 @@ func TestListRecords(t *testing.T) {
 		DomainDNSGetHostsResult: &namecheap.DomainDNSGetHostsResult{
 			Hosts: &[]namecheap.DomainsDNSHostRecordDetailed{
 				{
-					Name: &hostName,
-					Type: &recordType,
+					Name:    &hostName,
+					Type:    &recordType,
 					Address: &address,
-					TTL: &ttl,
+					TTL:     &ttl,
 				},
 			},
 		},
@@ -163,8 +165,8 @@ func TestUpdateRecord(t *testing.T) {
 		DomainDNSGetHostsResult: &namecheap.DomainDNSGetHostsResult{
 			Hosts: &[]namecheap.DomainsDNSHostRecordDetailed{
 				{
-					Name: &hostName,
-					Type: &recordType,
+					Name:    &hostName,
+					Type:    &recordType,
 					Address: &address,
 				},
 			},
@@ -196,3 +198,52 @@ func TestUpdateRecord(t *testing.T) {
 
 // Conformance check
 var _ dnsprovider.Provider = (*NamecheapProvider)(nil)
+
+// Stateful lightweight fake Namecheap client used for conformance tests
+type StatefulNamecheapClient struct {
+	domains []namecheap.Domain
+	hosts   []namecheap.DomainsDNSHostRecordDetailed
+}
+
+func NewStatefulNamecheapClient(domain string) *StatefulNamecheapClient {
+	d := namecheap.Domain{Name: namecheap.String(domain)}
+	return &StatefulNamecheapClient{domains: []namecheap.Domain{d}, hosts: []namecheap.DomainsDNSHostRecordDetailed{}}
+}
+
+func (s *StatefulNamecheapClient) DomainsGetList(args *namecheap.DomainsGetListArgs) (*namecheap.DomainsGetListCommandResponse, error) {
+	return &namecheap.DomainsGetListCommandResponse{Domains: &s.domains}, nil
+}
+
+func (s *StatefulNamecheapClient) DomainsGetInfo(domainName string) (*namecheap.DomainsGetInfoCommandResponse, error) {
+	return &namecheap.DomainsGetInfoCommandResponse{DomainDNSGetListResult: &namecheap.DomainsGetInfoResult{DomainName: namecheap.String(domainName), IsPremium: namecheap.Bool(false), DnsDetails: &namecheap.DnsDetails{IsUsingOurDNS: namecheap.Bool(true)}}}, nil
+}
+
+func (s *StatefulNamecheapClient) DomainsDNSGetHosts(domainName string) (*namecheap.DomainsDNSGetHostsCommandResponse, error) {
+	hosts := make([]namecheap.DomainsDNSHostRecordDetailed, len(s.hosts))
+	copy(hosts, s.hosts)
+	return &namecheap.DomainsDNSGetHostsCommandResponse{DomainDNSGetHostsResult: &namecheap.DomainDNSGetHostsResult{Hosts: &hosts}}, nil
+}
+
+func (s *StatefulNamecheapClient) DomainsDNSSetHosts(args *namecheap.DomainsDNSSetHostsArgs) (*namecheap.DomainsDNSSetHostsCommandResponse, error) {
+	if args == nil || args.Records == nil {
+		s.hosts = []namecheap.DomainsDNSHostRecordDetailed{}
+		return &namecheap.DomainsDNSSetHostsCommandResponse{}, nil
+	}
+
+	recs := *args.Records
+	h := make([]namecheap.DomainsDNSHostRecordDetailed, 0, len(recs))
+	for _, r := range recs {
+		h = append(h, namecheap.DomainsDNSHostRecordDetailed{ Name: r.HostName, Type: r.RecordType, Address: r.Address, TTL: r.TTL })
+	}
+	s.hosts = h
+	return &namecheap.DomainsDNSSetHostsCommandResponse{}, nil
+}
+
+func TestNamecheapConformance(t *testing.T) {
+	state := NewStatefulNamecheapClient("example.com")
+	p := &NamecheapProvider{client: state}
+
+	factory := func() (dnsprovider.Provider, error) { return p, nil }
+
+	conformance.RunConformanceTests(t, factory)
+}
