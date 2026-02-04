@@ -353,7 +353,7 @@ operations:
 		fmt.Println("=====================================")
 
 		for i, op := range operations {
-			action := strings.Title(op.Action)
+			action := titleCase(op.Action)
 			fmt.Printf("%d. %s %s %s → %s", i+1, action, op.Record.HostName, op.Record.RecordType, op.Record.Address)
 			if op.Record.TTL > 0 {
 				fmt.Printf(" (TTL: %d)", op.Record.TTL)
@@ -624,4 +624,11 @@ func parseBulkOperationsFile(filePath string) ([]dns.BulkOperation, error) {
 	}
 
 	return operations, nil
+}
+
+func titleCase(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + strings.ToLower(s[1:])
 }

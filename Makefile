@@ -41,10 +41,20 @@ test-coverage: ## Run tests with coverage
 	go test -v -race -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
+test-conformance: ## Run conformance tests
+	@echo "Running conformance tests..."
+	go test -v ./pkg/dns/provider/... -run Conformance
+
 lint: ## Run linter
 	@echo "Running golangci-lint v2..."
-	@golangci-lint --version
-	@golangci-lint run
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run; \
+	elif [ -f $$(go env GOPATH)/bin/golangci-lint ]; then \
+		$$(go env GOPATH)/bin/golangci-lint run; \
+	else \
+		echo "golangci-lint not found"; \
+		exit 1; \
+	fi
 
 lint-fix: ## Run linter with auto-fix
 	@echo "Running golangci-lint v2 with auto-fix..."

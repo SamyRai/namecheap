@@ -214,9 +214,6 @@ func ExtractRecords(data interface{}, listPath string) ([]map[string]interface{}
 				// Some APIs might return empty object instead of empty list
 				return []map[string]interface{}{}, nil
 			}
-		case reflect.Slice, reflect.Array:
-			// If we hit an array/slice, we're done navigating
-			break
 		default:
 			return nil, fmt.Errorf("invalid path '%s': cannot navigate through %v", listPath, current.Kind())
 		}

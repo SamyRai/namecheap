@@ -46,20 +46,6 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.zonekit.yaml)")
 	rootCmd.PersistentFlags().StringVar(&accountName, "account", "", "use specific account (default: current account)")
-
-	// Legacy flags for backward compatibility (deprecated)
-	rootCmd.PersistentFlags().String("username", "", "Namecheap username (deprecated: use account management)")
-	rootCmd.PersistentFlags().String("api-user", "", "Namecheap API user (deprecated: use account management)")
-	rootCmd.PersistentFlags().String("api-key", "", "Namecheap API key (deprecated: use account management)")
-	rootCmd.PersistentFlags().String("client-ip", "", "Client IP address (deprecated: use account management)")
-	rootCmd.PersistentFlags().Bool("sandbox", false, "Use Namecheap sandbox environment (deprecated: use account management)")
-
-	// Mark legacy flags as deprecated
-	rootCmd.PersistentFlags().MarkDeprecated("username", "use account management instead")
-	rootCmd.PersistentFlags().MarkDeprecated("api-user", "use account management instead")
-	rootCmd.PersistentFlags().MarkDeprecated("api-key", "use account management instead")
-	rootCmd.PersistentFlags().MarkDeprecated("client-ip", "use account management instead")
-	rootCmd.PersistentFlags().MarkDeprecated("sandbox", "use account management instead")
 }
 
 // initConfig reads in config file and ENV variables if set.

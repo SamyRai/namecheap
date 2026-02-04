@@ -106,7 +106,7 @@
 ### Phase 4: Integration & Polish (P2 - Medium)
 
 - [ ] **4.1** CI/CD Integration
-  - [ ] Add `make test-conformance` target
+  - [x] Add `make test-conformance` target
   - [ ] Add GitHub Actions job to run conformance tests on PRs
   - [ ] Add optional integration tests (gated by secrets)
   - [ ] Add coverage reporting for provider packages
@@ -120,9 +120,9 @@
   - [ ] Update README with multi-provider examples
 
 - [ ] **4.3** Cleanup & Release
-  - [ ] Remove legacy/duplicate code
-  - [ ] Run `gofmt`, `go vet`, `golangci-lint` on all changes
-  - [ ] Fix critical linter warnings
+  - [x] Remove legacy/duplicate code
+  - [x] Run `gofmt`, `go vet`, `golangci-lint` on all changes
+  - [x] Fix critical linter warnings
   - [ ] Update CHANGELOG with breaking changes
   - [ ] Bump major version (v2.0.0 or similar)
   - [ ] Tag release
