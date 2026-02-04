@@ -50,13 +50,25 @@ func RunConformanceTests(t *testing.T, factory ProviderFactory) {
 	})
 }
 
+func containsString(slice []string, s string) bool {
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
 func testRecordCRUD(t *testing.T, ctx context.Context, p provider.Provider, caps provider.ProviderCapabilities, zoneID string) {
-	// Create
+	// Create (TXT) with metadata
 	newRecord := dnsrecord.Record{
 		HostName:   "conformance-test",
 		RecordType: dnsrecord.RecordTypeTXT,
 		Address:    "test-value",
 		TTL:        300,
+		Metadata: map[string]interface{}{
+			"conformance": "true",
+		},
 	}
 
 	created, err := p.CreateRecord(ctx, zoneID, newRecord)
@@ -70,6 +82,15 @@ func testRecordCRUD(t *testing.T, ctx context.Context, p provider.Provider, caps
 	assert.Equal(t, newRecord.HostName, created.HostName)
 	assert.Equal(t, newRecord.RecordType, created.RecordType)
 	assert.Equal(t, newRecord.Address, created.Address)
+
+	// Metadata preservation (best-effort)
+	if newRecord.Metadata != nil {
+		if created.Metadata != nil {
+			assert.Equal(t, "true", created.Metadata["conformance"])
+		} else {
+			t.Log("Provider did not return metadata for created record; skipping metadata assertion")
+		}
+	}
 
 	// Read (List)
 	records, err := p.ListRecords(ctx, zoneID)
@@ -90,6 +111,30 @@ func testRecordCRUD(t *testing.T, ctx context.Context, p provider.Provider, caps
 		}
 	}
 	assert.True(t, found, "Created record not found in ListRecords")
+
+	// SRV specific test
+	if containsString(caps.SupportedRecordTypes, dnsrecord.RecordTypeSRV) {
+		srv := dnsrecord.Record{
+			HostName:   "_sip._tcp",
+			RecordType: dnsrecord.RecordTypeSRV,
+			Priority:   10,
+			Weight:     5,
+			Port:       5060,
+			Target:     "sip.example.com",
+			TTL:        300,
+		}
+
+		createdSRV, err := p.CreateRecord(ctx, zoneID, srv)
+		require.NoError(t, err, "CreateRecord (SRV) failed")
+		if createdSRV != nil {
+			assert.Equal(t, srv.HostName, createdSRV.HostName)
+			assert.Equal(t, srv.RecordType, createdSRV.RecordType)
+			assert.Equal(t, srv.Priority, createdSRV.Priority)
+			assert.Equal(t, srv.Weight, createdSRV.Weight)
+			assert.Equal(t, srv.Port, createdSRV.Port)
+			assert.Equal(t, srv.Target, createdSRV.Target)
+		}
+	}
 
 	if caps.SupportsRecordID {
 		// Update
@@ -113,11 +158,16 @@ func testRecordCRUD(t *testing.T, ctx context.Context, p provider.Provider, caps
 	} else {
 		t.Log("Skipping Update/Delete by ID as provider does not support it")
 
-		// Optional: Test BulkReplace if supported
+		// Test BulkReplace if supported
 		if caps.SupportsBulkReplace {
-			// Clean up via bulk replace (empty list or original list minus created)
-			// For now, just logging
-			t.Log("BulkReplace supported but not tested in this harness yet")
+			// Try to remove all records in the zone via BulkReplaceRecords
+			if err := p.BulkReplaceRecords(ctx, zoneID, []dnsrecord.Record{}); err != nil {
+				t.Fatalf("BulkReplaceRecords failed: %v", err)
+			}
+
+			recs, err := p.ListRecords(ctx, zoneID)
+			require.NoError(t, err)
+			assert.Len(t, recs, 0, "Expected zero records after BulkReplaceRecords([])")
 		}
 	}
 }
