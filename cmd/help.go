@@ -56,8 +56,6 @@ var helpCmd = &cobra.Command{
 
 		fmt.Println("⚙️  Configuration Commands:")
 		fmt.Println("  zonekit config init                      - Initialize config file")
-		fmt.Println("  zonekit config set                       - Set configuration (legacy)")
-		fmt.Println("  zonekit config show                      - Show configuration (legacy)")
 		fmt.Println("  zonekit config validate                  - Validate configuration")
 		fmt.Println()
 
@@ -103,7 +101,6 @@ var helpCmd = &cobra.Command{
 		fmt.Println("📁 Configuration File:")
 		fmt.Println("• Location: ~/.zonekit.yaml")
 		fmt.Println("• Format: YAML with multi-account support")
-		fmt.Println("• Automatic migration from legacy format")
 		fmt.Println()
 
 		fmt.Println("💡 Pro Tips:")

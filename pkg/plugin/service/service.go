@@ -3,6 +3,8 @@ package service
 import (
 	"fmt"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"zonekit/pkg/dns"
 	"zonekit/pkg/dnsrecord"
@@ -369,7 +371,7 @@ func (p *ServicePlugin) list(ctx *plugin.Context) error {
 	}
 
 	for category, configs := range categories {
-		ctx.Output.Printf("\n%s:\n", strings.Title(category))
+		ctx.Output.Printf("\n%s:\n", titleCase(category))
 		for _, config := range configs {
 			ctx.Output.Printf("  %s - %s\n", config.Name, config.DisplayName)
 			if config.Description != "" {
@@ -550,4 +552,15 @@ func ensureTrailingDot(hostname string) string {
 		return hostname + "."
 	}
 	return hostname
+}
+
+func titleCase(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	r, size := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError {
+		return s
+	}
+	return string(unicode.ToUpper(r)) + strings.ToLower(s[size:])
 }

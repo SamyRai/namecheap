@@ -25,13 +25,6 @@ type AccountConfig struct {
 type Config struct {
 	Accounts       map[string]*AccountConfig `yaml:"accounts" mapstructure:"accounts"`
 	CurrentAccount string                    `yaml:"current_account" mapstructure:"current_account"`
-
-	// Legacy fields for backward compatibility
-	Username   string `yaml:"username" mapstructure:"username"`
-	APIUser    string `yaml:"api_user" mapstructure:"api_user"`
-	APIKey     string `yaml:"api_key" mapstructure:"api_key"`
-	ClientIP   string `yaml:"client_ip" mapstructure:"client_ip"`
-	UseSandbox bool   `yaml:"use_sandbox" mapstructure:"use_sandbox"`
 }
 
 // Manager handles configuration operations
@@ -74,11 +67,6 @@ func NewManagerWithPath(configPath string) (*Manager, error) {
 		} else {
 			return nil, fmt.Errorf("failed to load config: %w", err)
 		}
-	}
-
-	// Migrate legacy config if needed
-	if err := manager.migrateLegacyConfig(); err != nil {
-		return nil, fmt.Errorf("failed to migrate legacy config: %w", err)
 	}
 
 	return manager, nil
@@ -258,7 +246,7 @@ func (m *Manager) createDefaultConfig() *Config {
 	return &Config{
 		Accounts: map[string]*AccountConfig{
 			"default": {
-				Provider:    "namecheap", // Default provider for backward compatibility
+				Provider:    "namecheap",
 				Username:    "your-provider-username",
 				APIUser:     "your-api-username",
 				APIKey:      "your-api-key-here",
@@ -271,52 +259,10 @@ func (m *Manager) createDefaultConfig() *Config {
 	}
 }
 
-// migrateLegacyConfig migrates legacy single-account configuration to new format
-func (m *Manager) migrateLegacyConfig() error {
-	// Check if we need to migrate (legacy fields exist and no accounts configured)
-	if (m.config.Username != "" || m.config.APIUser != "" || m.config.APIKey != "" || m.config.ClientIP != "") &&
-		(m.config.Accounts == nil || len(m.config.Accounts) == 0) {
-
-		// Create default account from legacy fields
-		defaultAccount := &AccountConfig{
-			Provider:    "namecheap", // Default provider for migrated legacy configs
-			Username:    m.config.Username,
-			APIUser:     m.config.APIUser,
-			APIKey:      m.config.APIKey,
-			ClientIP:    m.config.ClientIP,
-			UseSandbox:  m.config.UseSandbox,
-			Description: "Migrated from legacy configuration",
-		}
-
-		// Initialize accounts map if needed
-		if m.config.Accounts == nil {
-			m.config.Accounts = make(map[string]*AccountConfig)
-		}
-
-		// Add the migrated account
-		m.config.Accounts["default"] = defaultAccount
-		m.config.CurrentAccount = "default"
-
-		// Clear legacy fields
-		m.config.Username = ""
-		m.config.APIUser = ""
-		m.config.APIKey = ""
-		m.config.ClientIP = ""
-		m.config.UseSandbox = false
-
-		// Save the migrated configuration
-		if err := m.Save(); err != nil {
-			return fmt.Errorf("failed to save migrated config: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// GetProvider returns the provider name for an account, defaulting to "namecheap" for backward compatibility
+// GetProvider returns the provider name for an account, defaulting to "namecheap"
 func (a *AccountConfig) GetProvider() string {
 	if a.Provider == "" {
-		return "namecheap" // Default provider for backward compatibility
+		return "namecheap"
 	}
 	return a.Provider
 }
