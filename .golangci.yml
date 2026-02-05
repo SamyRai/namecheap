@@ -1,8 +1,6 @@
 # golangci-lint v2 configuration for 2025
 # Modern, production-ready configuration
 
-version: "2"
-
 # Run configuration
 run:
   timeout: 5m
@@ -60,17 +58,4 @@ issues:
   new-from-patch: ""
   # Note: Use //nolint comments for acceptable cases like interactive CLI input/output
 
-# Severity configuration
-severity:
-  default: error
-  rules:
-    - linters:
-        - errcheck
-        - gosec
-      severity: error
-    - linters:
-        - revive
-      severity: warning
-    - linters:
-        - misspell
-      severity: warning
+# Severity configuration (removed due to config error)

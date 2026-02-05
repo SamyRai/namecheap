@@ -36,13 +36,13 @@ func (s *VersionTestSuite) TestFullString() {
 }
 
 func (s *VersionTestSuite) TestIsPreRelease() {
-	// Test with current version (0.1.0 should be pre-release)
+	// Test with current version (2.0.0 should not be pre-release)
 	result := IsPreRelease()
-	s.Require().True(result, "Version 0.1.0 should be considered pre-release")
+	s.Require().False(result, "Version 2.0.0 should not be considered pre-release")
 }
 
 func (s *VersionTestSuite) TestIsMajorRelease() {
-	// Test with current version (0.1.0 should not be major)
+	// Test with current version (2.0.0 should be major)
 	result := IsMajorRelease()
-	s.Require().False(result, "Version 0.1.0 should not be considered major release")
+	s.Require().True(result, "Version 2.0.0 should be considered major release")
 }
