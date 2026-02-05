@@ -8,7 +8,7 @@ import (
 var (
 	// Version is the application version (semantic versioning)
 	// This should be updated when creating releases
-	Version = "0.1.0"
+	Version = "2.0.0"
 
 	// BuildDate is the build date (set during build)
 	BuildDate = "unknown"
