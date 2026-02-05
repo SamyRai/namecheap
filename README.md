@@ -40,13 +40,13 @@ A command-line interface for managing DNS zones and records across multiple prov
 
 | Feature | Description |
 |---------|-------------|
-| **Multi-Provider Support** | Support for multiple DNS providers (Namecheap, Cloudflare, and more) |
-| **Multi-Account Management** | Configure and switch between multiple provider accounts |
+| **Multi-Provider Support** | Unified interface for Namecheap, Cloudflare, DigitalOcean, GoDaddy, and more |
+| **Multi-Account Management** | Configure and switch between multiple provider accounts seamlessly |
+| **Universal DNS API** | Consistent commands regardless of the underlying provider |
 | **Domain Management** | List, check, and manage your domains |
-| **DNS Management** | Create, update, and delete DNS records |
-| **Bulk Operations** | Perform multiple DNS operations at once |
-| **Account Switching** | Easy switching between different accounts |
-| **Plugin System** | Extensible plugin architecture for custom functionality |
+| **DNS Management** | Create, update, and delete DNS records with ID support |
+| **Bulk Operations** | Perform atomic or orchestrated bulk updates |
+| **Extensible Architecture** | Easy to add new providers via OpenAPI or custom adapters |
 | **Secure Configuration** | API keys and credentials stored securely |
 
 ## Quick Start
@@ -81,8 +81,11 @@ The tool automatically detects configuration files in this priority order:
 # Initialize configuration
 ./zonekit config init
 
-# Or add account interactively
-./zonekit account add
+# Add a Namecheap account
+./zonekit account add namecheap-prod --provider namecheap
+
+# Add a Cloudflare account
+./zonekit account add cf-prod --provider cloudflare
 ```
 
 ### 3. Test Your Setup
@@ -231,9 +234,6 @@ The tool automatically detects configuration files in this priority order:
 ./zonekit dns --help
 ```
 
-## Migration from Legacy Config
-
-If you have an existing single-account configuration, the tool will automatically migrate it to the new multi-account format. Your existing configuration will be preserved as the `default` account.
 
 ## Development
 

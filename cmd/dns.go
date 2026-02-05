@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"text/tabwriter"
+	"unicode"
+	"unicode/utf8"
 
 	"zonekit/internal/cmdutil"
 	"zonekit/pkg/dns"
@@ -630,5 +632,9 @@ func titleCase(s string) string {
 	if len(s) == 0 {
 		return s
 	}
-	return strings.ToUpper(s[:1]) + strings.ToLower(s[1:])
+	r, size := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError {
+		return s
+	}
+	return string(unicode.ToUpper(r)) + strings.ToLower(s[size:])
 }
