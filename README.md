@@ -2,9 +2,9 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue?style=flat-square)
-![Status](https://img.shields.io/badge/status-pre--1.0.0-orange?style=flat-square)
-![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go)
+![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)
+![Status](https://img.shields.io/badge/status-stable-green?style=flat-square)
+![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat-square&logo=go)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
 A command-line interface for managing DNS zones and records across multiple providers with **multi-account support**.
@@ -21,9 +21,9 @@ A command-line interface for managing DNS zones and records across multiple prov
 >
 > **This is an independent, community-maintained project.**
 >
-> **Current Status: Pre-1.0.0 Release (v0.1.0)**
+> **Current Status: v2.0.0 Release**
 >
-> This tool is currently in active development and has **not reached version 1.0.0**. As such:
+> This tool has undergone a major refactor (Provider Contract v2) and is considered stable for general use. However:
 >
 > - ⚠️ **Use at your own risk and responsibility**
 > - ⚠️ **No warranties or guarantees are provided**
@@ -59,7 +59,7 @@ A command-line interface for managing DNS zones and records across multiple prov
 ```bash
 # Clone the repository
 git clone https://github.com/SamyRai/zonekit.git
-cd namecheap
+cd zonekit
 
 # Build the binary
 make build
@@ -240,13 +240,15 @@ The tool automatically detects configuration files in this priority order:
 ### Project Structure
 
 ```
-namecheap/
+zonekit/
 ├── cmd/                    # Command implementations
 ├── pkg/                    # Core packages
-│   ├── client/            # Namecheap API client
+│   ├── client/            # HTTP Client wrapper
 │   ├── config/            # Configuration management
 │   ├── domain/            # Domain operations
-│   └── dns/               # DNS operations
+│   ├── dns/               # DNS service logic
+│   │   └── provider/      # Provider implementations (Contract v2)
+│   └── plugin/            # Plugin system
 ├── configs/                # Configuration files
 ├── internal/               # Internal packages
 └── main.go                 # Entry point

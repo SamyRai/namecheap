@@ -27,7 +27,7 @@ jobs:
     needs: conformance
     runs-on: ubuntu-latest
     # Only run if secrets are available (not on forked PRs)
-    if: github.repository == github.event.repository.full_name && (secrets.CLOUDFLARE_API_TOKEN != '' || secrets.DIGITALOCEAN_TOKEN != '')
+    if: github.repository == github.event.repository.full_name && (secrets.CLOUDFLARE_API_TOKEN != '' || secrets.DIGITALOCEAN_TOKEN != '' || secrets.GODADDY_API_KEY != '' || secrets.NAMECHEAP_API_KEY != '')
     steps:
     - uses: actions/checkout@v4
 
