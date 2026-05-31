@@ -6,7 +6,7 @@
 accounts:
   # Default account (used when no specific account is selected)
   default:
-    provider: "namecheap"  # DNS provider: "namecheap", "cloudflare", etc.
+    provider: "namecheap" # DNS provider: "namecheap", "cloudflare", etc.
     username: "your-namecheap-username"
     api_user: "your-api-username"
     api_key: "your-api-key-here"

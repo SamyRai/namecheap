@@ -33,6 +33,7 @@
 ## Response Structure
 
 DigitalOcean wraps records in a `domain_records` object:
+
 ```json
 {
   "domain_records": [
@@ -54,8 +55,8 @@ This is a custom OpenAPI spec created from DigitalOcean's official API documenta
 ## Updating
 
 To update this spec:
+
 1. Check DigitalOcean's official OpenAPI repository
 2. Extract DNS-related paths if needed
 3. Update the spec accordingly
 4. Test with the auto-discovery system
-

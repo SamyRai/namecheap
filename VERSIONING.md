@@ -15,6 +15,7 @@ Versions follow the format: `MAJOR.MINOR.PATCH` (e.g., `1.2.3`)
 **Current Version: 0.1.0**
 
 This project is currently in **pre-1.0.0** status, meaning:
+
 - The API is not considered stable
 - Breaking changes may occur between minor versions
 - Use at your own risk and responsibility
@@ -47,11 +48,13 @@ Use GitHub Actions workflow to bump versions:
 ### Version Information
 
 Check the current version:
+
 ```bash
 ./zonekit --version
 ```
 
 Or programmatically:
+
 ```go
 import "zonekit/pkg/version"
 
@@ -74,6 +77,7 @@ fmt.Println(version.FullString())
 ## Pre-Release Versions
 
 Pre-release versions can be indicated with suffixes:
+
 - `0.1.0-alpha.1` - Alpha release
 - `0.1.0-beta.1` - Beta release
 - `0.1.0-rc.1` - Release candidate
@@ -81,4 +85,3 @@ Pre-release versions can be indicated with suffixes:
 ## Version History
 
 - `v0.1.0` - Initial release (2025-11-22)
-

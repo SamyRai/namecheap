@@ -86,11 +86,11 @@ components:
     DNSRecord:
       type: object
       properties:
-        name: {type: string}      # Maps to hostname
-        type: {type: string}      # Maps to record_type
-        data: {type: string}       # Maps to address
-        ttl: {type: integer}      # Maps to ttl
-        priority: {type: integer} # Maps to mx_pref
+        name: { type: string } # Maps to hostname
+        type: { type: string } # Maps to record_type
+        data: { type: string } # Maps to address
+        ttl: { type: integer } # Maps to ttl
+        priority: { type: integer } # Maps to mx_pref
 ```
 
 ### Step 3: Done!

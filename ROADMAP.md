@@ -3,6 +3,7 @@
 This document outlines the strategic vision and development milestones for ZoneKit.
 
 ## v2.0.0 (Current Stable)
+
 - **Status:** Released
 - **Focus:** Provider Contract Refactor, OpenAPI Support, Adapter Pattern.
 - **Key Features:**
@@ -12,6 +13,7 @@ This document outlines the strategic vision and development milestones for ZoneK
   - Support for Namecheap, Cloudflare, DigitalOcean, GoDaddy.
 
 ## v2.1.0 (Upcoming)
+
 - **Focus:** Import/Export & Usability
 - **Timeline:** Q2 2025
 - **Features:**
@@ -20,6 +22,7 @@ This document outlines the strategic vision and development milestones for ZoneK
   - Enhanced bulk operation error reporting.
 
 ## v2.2.0
+
 - **Focus:** Domain Lifecycle Management
 - **Timeline:** Q3 2025
 - **Features:**
@@ -29,6 +32,7 @@ This document outlines the strategic vision and development milestones for ZoneK
   - Nameserver management unification.
 
 ## v2.3.0
+
 - **Focus:** Authentication & Security
 - **Timeline:** Q4 2025
 - **Features:**
@@ -37,6 +41,7 @@ This document outlines the strategic vision and development milestones for ZoneK
   - Audit logging for all operations.
 
 ## v3.0.0
+
 - **Focus:** Plugin Ecosystem
 - **Timeline:** 2026
 - **Features:**

@@ -51,4 +51,3 @@ verification:
     - type: TXT
       hostname: "@"
       contains: include:_spf.google.com
-

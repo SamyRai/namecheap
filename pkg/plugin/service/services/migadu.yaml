@@ -56,4 +56,3 @@ verification:
     - type: CNAME
       hostname: autoconfig
       contains: autoconfig.migadu.com
-

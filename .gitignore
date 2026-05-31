@@ -47,3 +47,6 @@ coverage.html
 # Temporary files
 tmp/
 temp/
+
+zonekit
+zonekit-linux

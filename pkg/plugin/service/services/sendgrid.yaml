@@ -28,4 +28,3 @@ verification:
     - type: CNAME
       hostname: s1._domainkey
       contains: sendgrid.net
-

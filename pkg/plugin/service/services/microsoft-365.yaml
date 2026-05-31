@@ -49,4 +49,3 @@ verification:
     - type: CNAME
       hostname: autodiscover
       contains: autodiscover.outlook.com
-

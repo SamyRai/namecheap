@@ -38,16 +38,16 @@ A command-line interface for managing DNS zones and records across multiple prov
 
 ## Features
 
-| Feature | Description |
-|---------|-------------|
-| **Multi-Provider Support** | Unified interface for Namecheap, Cloudflare, DigitalOcean, GoDaddy, and more |
-| **Multi-Account Management** | Configure and switch between multiple provider accounts seamlessly |
-| **Universal DNS API** | Consistent commands regardless of the underlying provider |
-| **Domain Management** | List, check, and manage your domains |
-| **DNS Management** | Create, update, and delete DNS records with ID support |
-| **Bulk Operations** | Perform atomic or orchestrated bulk updates |
-| **Extensible Architecture** | Easy to add new providers via OpenAPI or custom adapters |
-| **Secure Configuration** | API keys and credentials stored securely |
+| Feature                      | Description                                                                  |
+| ---------------------------- | ---------------------------------------------------------------------------- |
+| **Multi-Provider Support**   | Unified interface for Namecheap, Cloudflare, DigitalOcean, GoDaddy, and more |
+| **Multi-Account Management** | Configure and switch between multiple provider accounts seamlessly           |
+| **Universal DNS API**        | Consistent commands regardless of the underlying provider                    |
+| **Domain Management**        | List, check, and manage your domains                                         |
+| **DNS Management**           | Create, update, and delete DNS records with ID support                       |
+| **Bulk Operations**          | Perform atomic or orchestrated bulk updates                                  |
+| **Extensible Architecture**  | Easy to add new providers via OpenAPI or custom adapters                     |
+| **Secure Configuration**     | API keys and credentials stored securely                                     |
 
 ## Quick Start
 
@@ -72,10 +72,10 @@ go build -o zonekit ./main.go
 
 The tool automatically detects configuration files in this priority order:
 
-| Priority | Location | Use Case |
-|----------|----------|----------|
-| **1** | `./configs/.zonekit.yaml` | Development |
-| **2** | `~/.zonekit.yaml` | Production |
+| Priority | Location                  | Use Case    |
+| -------- | ------------------------- | ----------- |
+| **1**    | `./configs/.zonekit.yaml` | Development |
+| **2**    | `~/.zonekit.yaml`         | Production  |
 
 ```bash
 # Initialize configuration
@@ -110,45 +110,45 @@ The tool automatically detects configuration files in this priority order:
 <details>
 <summary><strong>Account Management</strong></summary>
 
-| Command | Description |
-|---------|-------------|
-| `account list` | List all accounts |
-| `account add [name]` | Add new account |
-| `account switch <name>` | Switch to account |
-| `account show [name]` | Show account details |
-| `account edit [name]` | Edit account |
-| `account remove <name>` | Remove account |
+| Command                 | Description          |
+| ----------------------- | -------------------- |
+| `account list`          | List all accounts    |
+| `account add [name]`    | Add new account      |
+| `account switch <name>` | Switch to account    |
+| `account show [name]`   | Show account details |
+| `account edit [name]`   | Edit account         |
+| `account remove <name>` | Remove account       |
 
 </details>
 
 <details>
 <summary><strong>Domain Management</strong></summary>
 
-| Command | Description |
-|---------|-------------|
-| `domain list` | List all domains |
-| `domain info <domain>` | Get domain details |
-| `domain check <domain>` | Check availability |
-| `domain renew <domain> [years]` | Renew domain |
-| `domain nameservers get <domain>` | Get nameservers |
-| `domain nameservers set <domain> <ns1> [ns2]...` | Set nameservers |
-| `domain nameservers default <domain>` | Reset to default |
+| Command                                          | Description        |
+| ------------------------------------------------ | ------------------ |
+| `domain list`                                    | List all domains   |
+| `domain info <domain>`                           | Get domain details |
+| `domain check <domain>`                          | Check availability |
+| `domain renew <domain> [years]`                  | Renew domain       |
+| `domain nameservers get <domain>`                | Get nameservers    |
+| `domain nameservers set <domain> <ns1> [ns2]...` | Set nameservers    |
+| `domain nameservers default <domain>`            | Reset to default   |
 
 </details>
 
 <details>
 <summary><strong>DNS Management</strong></summary>
 
-| Command | Description |
-|---------|-------------|
-| `dns list <domain>` | List DNS records |
-| `dns add <domain> <host> <type> <value>` | Add DNS record |
+| Command                                     | Description       |
+| ------------------------------------------- | ----------------- |
+| `dns list <domain>`                         | List DNS records  |
+| `dns add <domain> <host> <type> <value>`    | Add DNS record    |
 | `dns update <domain> <host> <type> <value>` | Update DNS record |
-| `dns delete <domain> <host> <type>` | Delete DNS record |
-| `dns clear <domain>` | Clear all records |
-| `dns bulk <domain> <file>` | Bulk operations |
-| `dns import <domain> <file>` | Import zone file |
-| `dns export <domain> [file]` | Export zone file |
+| `dns delete <domain> <host> <type>`         | Delete DNS record |
+| `dns clear <domain>`                        | Clear all records |
+| `dns bulk <domain> <file>`                  | Bulk operations   |
+| `dns import <domain> <file>`                | Import zone file  |
+| `dns export <domain> [file]`                | Export zone file  |
 
 </details>
 
@@ -234,7 +234,6 @@ The tool automatically detects configuration files in this priority order:
 ./zonekit dns --help
 ```
 
-
 ## Development
 
 ### Project Structure
@@ -282,6 +281,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 For issues and questions:
+
 - Check the troubleshooting section above
 - Review the help command: `./zonekit help`
 - Open an issue on GitHub

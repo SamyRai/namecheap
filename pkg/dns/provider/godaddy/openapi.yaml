@@ -31,14 +31,14 @@ paths:
             type: string
           description: DNS record name filter
       responses:
-        '200':
+        "200":
           description: List of DNS records
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/DNSRecord'
+                  $ref: "#/components/schemas/DNSRecord"
     patch:
       summary: Replace all DNS records for a domain
       operationId: replaceDNSRecords
@@ -57,9 +57,9 @@ paths:
             schema:
               type: array
               items:
-                $ref: '#/components/schemas/DNSRecord'
+                $ref: "#/components/schemas/DNSRecord"
       responses:
-        '200':
+        "200":
           description: Records replaced successfully
     post:
       summary: Add DNS records to domain
@@ -79,9 +79,9 @@ paths:
             schema:
               type: array
               items:
-                $ref: '#/components/schemas/DNSRecord'
+                $ref: "#/components/schemas/DNSRecord"
       responses:
-        '200':
+        "200":
           description: Records added successfully
   /domains/{domain}/records/{type}/{name}:
     get:
@@ -106,14 +106,14 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: DNS record
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/DNSRecord'
+                  $ref: "#/components/schemas/DNSRecord"
     put:
       summary: Update DNS record
       operationId: updateDNSRecord
@@ -142,9 +142,9 @@ paths:
             schema:
               type: array
               items:
-                $ref: '#/components/schemas/DNSRecord'
+                $ref: "#/components/schemas/DNSRecord"
       responses:
-        '200':
+        "200":
           description: Record updated successfully
     delete:
       summary: Delete DNS record
@@ -168,7 +168,7 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Record deleted successfully
 components:
   securitySchemes:
@@ -206,4 +206,3 @@ components:
           example: 10
 security:
   - ApiKeyAuth: []
-

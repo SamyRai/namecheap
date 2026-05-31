@@ -16,11 +16,13 @@
 ## DNS Endpoints
 
 The schema includes DNS-related endpoints under:
+
 - `/zones/{zone_id}/dns_records` - DNS record management operations
 
 ## Usage
 
 This schema is automatically discovered by the auto-discovery system. The system will:
+
 1. Parse the OpenAPI spec
 2. Extract DNS-related endpoints
 3. Extract authentication methods
@@ -47,4 +49,3 @@ curl -L https://raw.githubusercontent.com/cloudflare/api-schemas/main/openapi.ya
 - The full spec is large because it includes all Cloudflare services
 - For DNS-only usage, you could extract just DNS paths (see script comments)
 - The auto-discovery system handles the full spec efficiently
-

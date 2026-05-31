@@ -21,12 +21,12 @@ paths:
             type: string
           description: Domain name
       responses:
-        '200':
+        "200":
           description: List of DNS records
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DNSRecordsResponse'
+                $ref: "#/components/schemas/DNSRecordsResponse"
     post:
       summary: Create a new DNS record
       operationId: createDNSRecord
@@ -43,14 +43,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DNSRecordRequest'
+              $ref: "#/components/schemas/DNSRecordRequest"
       responses:
-        '201':
+        "201":
           description: DNS record created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DNSRecordResponse'
+                $ref: "#/components/schemas/DNSRecordResponse"
   /domains/{domain_name}/records/{record_id}:
     get:
       summary: Get a specific DNS record
@@ -69,12 +69,12 @@ paths:
           schema:
             type: integer
       responses:
-        '200':
+        "200":
           description: DNS record
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DNSRecordResponse'
+                $ref: "#/components/schemas/DNSRecordResponse"
     put:
       summary: Update a DNS record
       operationId: updateDNSRecord
@@ -96,14 +96,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DNSRecordRequest'
+              $ref: "#/components/schemas/DNSRecordRequest"
       responses:
-        '200':
+        "200":
           description: DNS record updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DNSRecordResponse'
+                $ref: "#/components/schemas/DNSRecordResponse"
     delete:
       summary: Delete a DNS record
       operationId: deleteDNSRecord
@@ -121,7 +121,7 @@ paths:
           schema:
             type: integer
       responses:
-        '204':
+        "204":
           description: DNS record deleted
 components:
   securitySchemes:
@@ -196,12 +196,11 @@ components:
         domain_records:
           type: array
           items:
-            $ref: '#/components/schemas/DNSRecord'
+            $ref: "#/components/schemas/DNSRecord"
     DNSRecordResponse:
       type: object
       properties:
         domain_record:
-          $ref: '#/components/schemas/DNSRecord'
+          $ref: "#/components/schemas/DNSRecord"
 security:
   - BearerAuth: []
-

@@ -33,4 +33,3 @@ verification:
     - type: TXT
       hostname: "@"
       contains: include:mailgun.org
-

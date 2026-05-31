@@ -37,8 +37,8 @@ This is a custom OpenAPI spec created from GoDaddy's official API documentation.
 ## Updating
 
 To update this spec:
+
 1. Check GoDaddy's official API documentation
 2. Verify endpoint changes
 3. Update the OpenAPI spec accordingly
 4. Test with the auto-discovery system
-
