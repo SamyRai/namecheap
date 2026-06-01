@@ -101,24 +101,24 @@ var accountAddCmd = &cobra.Command{
 		account := &config.AccountConfig{}
 
 		fmt.Print("Provider Username: ")
-		fmt.Scanln(&account.Username)
+		_, _ = fmt.Scanln(&account.Username)
 
 		fmt.Print("API User: ")
-		fmt.Scanln(&account.APIUser)
+		_, _ = fmt.Scanln(&account.APIUser)
 
 		fmt.Print("API Key: ")
-		fmt.Scanln(&account.APIKey)
+		_, _ = fmt.Scanln(&account.APIKey)
 
 		fmt.Print("Client IP Address: ")
-		fmt.Scanln(&account.ClientIP)
+		_, _ = fmt.Scanln(&account.ClientIP)
 
 		var sandboxInput string
 		fmt.Print("Use Sandbox Environment? (y/N): ")
-		fmt.Scanln(&sandboxInput)
+		_, _ = fmt.Scanln(&sandboxInput)
 		account.UseSandbox = strings.ToLower(sandboxInput) == "y" || strings.ToLower(sandboxInput) == "yes"
 
 		fmt.Print("Description (optional): ")
-		fmt.Scanln(&account.Description)
+		_, _ = fmt.Scanln(&account.Description)
 
 		// Validate account
 		if err := configManager.ValidateAccount(account); err != nil {
@@ -135,7 +135,7 @@ var accountAddCmd = &cobra.Command{
 		// Ask if user wants to switch to this account
 		var switchInput string
 		fmt.Printf("Switch to account '%s'? (Y/n): ", accountName)
-		fmt.Scanln(&switchInput)
+		_, _ = fmt.Scanln(&switchInput)
 		if switchInput == "" || strings.ToLower(switchInput) == "y" || strings.ToLower(switchInput) == "yes" {
 			if err := configManager.SetCurrentAccount(accountName); err != nil {
 				return fmt.Errorf("failed to switch to account '%s': %w", accountName, err)
@@ -215,7 +215,7 @@ var accountRemoveCmd = &cobra.Command{
 		// Confirm removal
 		fmt.Printf("Are you sure you want to remove account '%s'? (y/N): ", accountName)
 		var confirm string
-		fmt.Scanln(&confirm)
+		_, _ = fmt.Scanln(&confirm)
 		if strings.ToLower(confirm) != "y" && strings.ToLower(confirm) != "yes" {
 			fmt.Println("Aborted.")
 			return nil
@@ -324,7 +324,7 @@ var accountEditCmd = &cobra.Command{
 
 		fmt.Printf("Provider Username [%s]: ", existingAccount.Username)
 		var input string
-		fmt.Scanln(&input)
+		_, _ = fmt.Scanln(&input)
 		if input != "" {
 			account.Username = input
 		} else {
@@ -332,7 +332,7 @@ var accountEditCmd = &cobra.Command{
 		}
 
 		fmt.Printf("API User [%s]: ", existingAccount.APIUser)
-		fmt.Scanln(&input)
+		_, _ = fmt.Scanln(&input)
 		if input != "" {
 			account.APIUser = input
 		} else {
@@ -344,7 +344,7 @@ var accountEditCmd = &cobra.Command{
 			masked = existingAccount.APIKey[:4]
 		}
 		fmt.Printf("API Key [%s***]: ", masked)
-		fmt.Scanln(&input)
+		_, _ = fmt.Scanln(&input)
 		if input != "" {
 			account.APIKey = input
 		} else {
@@ -352,7 +352,7 @@ var accountEditCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Client IP Address [%s]: ", existingAccount.ClientIP)
-		fmt.Scanln(&input)
+		_, _ = fmt.Scanln(&input)
 		if input != "" {
 			account.ClientIP = input
 		} else {
@@ -360,7 +360,7 @@ var accountEditCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Use Sandbox Environment? [%t] (y/N): ", existingAccount.UseSandbox)
-		fmt.Scanln(&input)
+		_, _ = fmt.Scanln(&input)
 		if input != "" {
 			account.UseSandbox = strings.ToLower(input) == "y" || strings.ToLower(input) == "yes"
 		} else {
@@ -368,7 +368,7 @@ var accountEditCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Description [%s]: ", existingAccount.Description)
-		fmt.Scanln(&input)
+		_, _ = fmt.Scanln(&input)
 		if input != "" {
 			account.Description = input
 		} else {
