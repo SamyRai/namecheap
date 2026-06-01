@@ -14,8 +14,8 @@ This document outlines the strategic vision and development milestones for ZoneK
 
 ## v2.1.0 (Upcoming)
 
+- **Status:** Released
 - **Focus:** Import/Export & Usability
-- **Timeline:** Q2 2025
 - **Features:**
   - Full BIND zone file import support (`dns import`).
   - Improved zone file export (configurable nameservers).
@@ -23,8 +23,8 @@ This document outlines the strategic vision and development milestones for ZoneK
 
 ## v2.2.0
 
+- **Status:** Released
 - **Focus:** Domain Lifecycle Management
-- **Timeline:** Q3 2025
 - **Features:**
   - Domain registration support across providers.
   - Domain renewal management.
@@ -33,8 +33,8 @@ This document outlines the strategic vision and development milestones for ZoneK
 
 ## v2.3.0
 
+- **Status:** Released
 - **Focus:** Authentication & Security
-- **Timeline:** Q4 2025
 - **Features:**
   - OAuth flow support for providers.
   - Secure credential storage improvements (system keyring integration).

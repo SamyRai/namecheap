@@ -10,8 +10,6 @@ import (
 	"zonekit/pkg/domain"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 )
 
 // configCmd represents the config command
@@ -27,96 +25,111 @@ var configSetCmd = &cobra.Command{
 	Short: "Set configuration values interactively",
 	Long:  `Set configuration values through an interactive prompt.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		config := make(map[string]interface{})
-
-		// Get current values if they exist
-		username := viper.GetString("username")
-		apiUser := viper.GetString("api-user")
-		apiKey := viper.GetString("api-key")
-		clientIP := viper.GetString("client-ip")
-		sandbox := viper.GetBool("sandbox")
+		configManager, err := config.NewManager()
+		if err != nil {
+			return err
+		}
+		accountName := configManager.GetCurrentAccountName()
+		accountConfig, err := configManager.GetCurrentAccount()
+		if err != nil {
+			accountConfig = &config.AccountConfig{Provider: "namecheap"}
+			configManager.AddAccount(accountName, accountConfig)
+		}
 
 		fmt.Println("DNS Provider Configuration Setup")
-		fmt.Println("=================================")
-		fmt.Println()
+		fmt.Printf("================================= (Account: %s)\n\n", accountName)
 
-		// Username
-		fmt.Print("Provider Username")
-		if username != "" {
-			fmt.Printf(" [%s]", username)
+		// Provider
+		fmt.Print("Provider")
+		if accountConfig.Provider != "" {
+			fmt.Printf(" [%s]", accountConfig.Provider)
 		}
 		fmt.Print(": ")
 		var input string
 		fmt.Scanln(&input)
 		if input != "" {
-			username = input
+			accountConfig.Provider = input
 		}
-		if username != "" {
-			config["username"] = username
+
+		// Username
+		fmt.Print("Provider Username")
+		if accountConfig.Username != "" {
+			fmt.Printf(" [%s]", accountConfig.Username)
+		}
+		fmt.Print(": ")
+		input = ""
+		fmt.Scanln(&input)
+		if input != "" {
+			accountConfig.Username = input
 		}
 
 		// API User
 		fmt.Print("API User")
-		if apiUser != "" {
-			fmt.Printf(" [%s]", apiUser)
+		if accountConfig.APIUser != "" {
+			fmt.Printf(" [%s]", accountConfig.APIUser)
 		}
 		fmt.Print(": ")
+		input = ""
 		fmt.Scanln(&input)
 		if input != "" {
-			apiUser = input
-		}
-		if apiUser != "" {
-			config["api_user"] = apiUser
+			accountConfig.APIUser = input
 		}
 
 		// API Key
 		fmt.Print("API Key")
-		if apiKey != "" {
-			masked := apiKey
-			if len(apiKey) > 4 {
-				masked = apiKey[:4]
+		if accountConfig.APIKey != "" {
+			masked := accountConfig.APIKey
+			if len(accountConfig.APIKey) > 4 {
+				masked = accountConfig.APIKey[:4]
 			}
 			fmt.Printf(" [%s***]", masked)
 		}
 		fmt.Print(": ")
+		input = ""
 		fmt.Scanln(&input)
 		if input != "" {
-			apiKey = input
-		}
-		if apiKey != "" {
-			config["api_key"] = apiKey
+			accountConfig.APIKey = input
 		}
 
 		// Client IP
 		fmt.Print("Client IP Address")
-		if clientIP != "" {
-			fmt.Printf(" [%s]", clientIP)
+		if accountConfig.ClientIP != "" {
+			fmt.Printf(" [%s]", accountConfig.ClientIP)
 		}
 		fmt.Print(": ")
+		input = ""
 		fmt.Scanln(&input)
 		if input != "" {
-			clientIP = input
-		}
-		if clientIP != "" {
-			config["client_ip"] = clientIP
+			accountConfig.ClientIP = input
 		}
 
 		// Sandbox
 		fmt.Print("Use Sandbox Environment? (y/N)")
-		if sandbox {
+		if accountConfig.UseSandbox {
 			fmt.Print(" [y]")
 		} else {
 			fmt.Print(" [N]")
 		}
 		fmt.Print(": ")
+		input = ""
 		fmt.Scanln(&input)
 		if input != "" {
-			sandbox = (input == "y" || input == "Y" || input == "yes" || input == "Yes")
+			accountConfig.UseSandbox = (input == "y" || input == "Y" || input == "yes" || input == "Yes")
 		}
-		config["use_sandbox"] = sandbox
 
 		// Save configuration
-		return saveConfig(config)
+		err = configManager.SaveSecretsToKeyring(accountName, accountConfig)
+		if err != nil {
+			fmt.Printf("Warning: Failed to save secrets to keyring: %v\n", err)
+			fmt.Println("Secrets will be stored in plain text in config file.")
+		}
+		
+		err = configManager.UpdateAccount(accountName, accountConfig)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Configuration saved to %s\n", configManager.GetConfigPath())
+		return nil
 	},
 }
 
@@ -126,31 +139,29 @@ var configShowCmd = &cobra.Command{
 	Short: "Show current configuration",
 	Long:  `Display the current configuration values.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Current Configuration:")
-		fmt.Println("=====================")
-
-		if configFile := viper.ConfigFileUsed(); configFile != "" {
-			fmt.Printf("Config file: %s\n", configFile)
-		} else {
-			fmt.Println("No config file found")
+		configManager, err := config.NewManager()
+		if err != nil {
+			return err
+		}
+		accountConfig, err := configManager.GetCurrentAccount()
+		if err != nil {
+			return err
 		}
 
-		fmt.Println()
+		fmt.Println("Current Configuration:")
+		fmt.Println("=====================")
+		fmt.Printf("Config file: %s\n", configManager.GetConfigPath())
+		fmt.Printf("Account: %s\n\n", configManager.GetCurrentAccountName())
 
-		username := viper.GetString("username")
-		apiUser := getStringWithFallback("api-user", "api_user")
-		apiKey := getStringWithFallback("api-key", "api_key")
-		clientIP := getStringWithFallback("client-ip", "client_ip")
-		sandbox := getBoolWithFallback("sandbox", "use_sandbox")
-
-		fmt.Printf("Username: %s\n", getValueOrEmpty(username))
-		fmt.Printf("API User: %s\n", getValueOrEmpty(apiUser))
-		fmt.Printf("API Key: %s\n", config.MaskAPIKey(apiKey))
-		fmt.Printf("Client IP: %s\n", getValueOrEmpty(clientIP))
-		fmt.Printf("Sandbox: %t\n", sandbox)
+		fmt.Printf("Provider: %s\n", getValueOrEmpty(accountConfig.Provider))
+		fmt.Printf("Username: %s\n", getValueOrEmpty(accountConfig.Username))
+		fmt.Printf("API User: %s\n", getValueOrEmpty(accountConfig.APIUser))
+		fmt.Printf("API Key: %s\n", config.MaskAPIKey(accountConfig.APIKey))
+		fmt.Printf("Client IP: %s\n", getValueOrEmpty(accountConfig.ClientIP))
+		fmt.Printf("Sandbox: %t\n", accountConfig.UseSandbox)
 
 		fmt.Println()
-		if username == "" || apiUser == "" || apiKey == "" || clientIP == "" {
+		if accountConfig.Username == "" || accountConfig.APIUser == "" || accountConfig.APIKey == "" || accountConfig.ClientIP == "" {
 			fmt.Println("⚠️  Some required configuration values are missing.")
 			fmt.Println("   Run 'zonekit config set' to configure them.")
 		} else {
@@ -184,23 +195,16 @@ var configInitCmd = &cobra.Command{
 				fmt.Println("Aborted.")
 				return nil
 			}
+			// Delete existing to force fresh default
+			os.Remove(configPath)
 		}
 
-		// Create example config
-		config := map[string]interface{}{
-			"username":    "your-provider-username",
-			"api_user":    "your-api-username",
-			"api_key":     "your-api-key",
-			"client_ip":   "your.public.ip.address",
-			"use_sandbox": false,
-		}
-
-		data, err := yaml.Marshal(config)
+		configManager, err := config.NewManagerWithPath(configPath)
 		if err != nil {
-			return fmt.Errorf("failed to marshal config: %w", err)
+			return fmt.Errorf("failed to initialize config manager: %w", err)
 		}
 
-		err = os.WriteFile(configPath, data, 0600)
+		err = configManager.Save()
 		if err != nil {
 			return fmt.Errorf("failed to write config file: %w", err)
 		}
@@ -221,22 +225,25 @@ var configValidateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Validating configuration...")
 
-		// Check required fields
-		username := viper.GetString("username")
-		apiUser := viper.GetString("api-user")
-		apiKey := viper.GetString("api-key")
-		clientIP := viper.GetString("client-ip")
+		configManager, err := config.NewManager()
+		if err != nil {
+			return err
+		}
+		accountConfig, err := configManager.GetCurrentAccount()
+		if err != nil {
+			return err
+		}
 
-		if username == "" {
+		if accountConfig.Username == "" {
 			return fmt.Errorf("username is required")
 		}
-		if apiUser == "" {
+		if accountConfig.APIUser == "" {
 			return fmt.Errorf("api-user is required")
 		}
-		if apiKey == "" {
+		if accountConfig.APIKey == "" {
 			return fmt.Errorf("api-key is required")
 		}
-		if clientIP == "" {
+		if accountConfig.ClientIP == "" {
 			return fmt.Errorf("client-ip is required")
 		}
 
@@ -245,20 +252,17 @@ var configValidateCmd = &cobra.Command{
 		// Test API connection
 		fmt.Println("Testing API connection...")
 
-		// Create a test client to validate credentials
-		testClient, err := cmdutil.CreateClient(&config.AccountConfig{
-			Username: username,
-			APIUser:  apiUser,
-			APIKey:   apiKey,
-			ClientIP: clientIP,
-		})
+		testClient, err := cmdutil.CreateClient(accountConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create test client: %w", err)
 		}
 
 		// Test the connection by making a simple API call
-		domainService := domain.NewService(testClient)
-		_, err = domainService.ListDomains()
+		domainService, err := domain.NewService(testClient)
+		if err != nil {
+			return fmt.Errorf("failed to create test domain service: %w", err)
+		}
+		_, err = domainService.ListDomains(cmd.Context())
 		if err != nil {
 			return fmt.Errorf("API connection test failed: %w", err)
 		}
@@ -271,49 +275,11 @@ var configValidateCmd = &cobra.Command{
 	},
 }
 
-func saveConfig(config map[string]interface{}) error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	configPath := filepath.Join(home, ".zonekit.yaml")
-
-	data, err := yaml.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	err = os.WriteFile(configPath, data, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
-	}
-
-	fmt.Printf("Configuration saved to %s\n", configPath)
-	return nil
-}
-
 func getValueOrEmpty(value string) string {
 	if value == "" {
 		return "(not set)"
 	}
 	return value
-}
-
-// getStringWithFallback tries the primary key first, then falls back to the alternative
-func getStringWithFallback(primary, fallback string) string {
-	if value := viper.GetString(primary); value != "" {
-		return value
-	}
-	return viper.GetString(fallback)
-}
-
-// getBoolWithFallback tries the primary key first, then falls back to the alternative
-func getBoolWithFallback(primary, fallback string) bool {
-	if viper.IsSet(primary) {
-		return viper.GetBool(primary)
-	}
-	return viper.GetBool(fallback)
 }
 
 func init() {

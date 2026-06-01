@@ -7,7 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 	"zonekit/internal/cmdutil"
+	pkgclient "zonekit/pkg/client"
+	"zonekit/pkg/config"
 	"zonekit/pkg/domain"
+	"zonekit/pkg/domain/model"
 )
 
 // domainCmd represents the domain command
@@ -36,8 +39,11 @@ var domainListCmd = &cobra.Command{
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
 
-		domainService := domain.NewService(client)
-		domains, err := domainService.ListDomains()
+		domainService, err := domain.NewService(client)
+		if err != nil {
+			return fmt.Errorf("failed to create domain service: %w", err)
+		}
+		domains, err := domainService.ListDomains(cmd.Context())
 		if err != nil {
 			return fmt.Errorf("failed to list domains: %w", err)
 		}
@@ -101,8 +107,11 @@ var domainInfoCmd = &cobra.Command{
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
 
-		domainService := domain.NewService(client)
-		domainInfo, err := domainService.GetDomainInfo(domainName)
+		domainService, err := domain.NewService(client)
+		if err != nil {
+			return fmt.Errorf("failed to create domain service: %w", err)
+		}
+		domainInfo, err := domainService.GetDomainInfo(cmd.Context(), domainName)
 		if err != nil {
 			return fmt.Errorf("failed to get domain info: %w", err)
 		}
@@ -117,6 +126,83 @@ var domainInfoCmd = &cobra.Command{
 		fmt.Printf("Premium: %t\n", domainInfo.IsPremium)
 		fmt.Printf("Using Provider DNS: %t\n", domainInfo.IsOurDNS)
 
+		return nil
+	},
+}
+
+// domainRegisterCmd represents the domain register command
+var domainRegisterCmd = &cobra.Command{
+	Use:   "register <domain>",
+	Short: "Register a new domain",
+	Long:  `Register a new domain using the configured contact profile.`,
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		domainName := args[0]
+		
+		years, _ := cmd.Flags().GetInt("years")
+		profileName, _ := cmd.Flags().GetString("contact-profile")
+
+		// Validate domain
+		if err := domain.ValidateDomain(domainName); err != nil {
+			return fmt.Errorf("invalid domain: %w", err)
+		}
+
+		// Get config manager to access ContactProfiles
+		configManager, err := config.NewManager()
+		if err != nil {
+			return fmt.Errorf("failed to get config manager: %w", err)
+		}
+
+		accountConfig, err := configManager.GetCurrentAccount()
+		if err != nil {
+			return fmt.Errorf("failed to get account configuration: %w", err)
+		}
+		
+		profile, err := configManager.GetContactProfile(profileName)
+		if err != nil {
+			return fmt.Errorf("failed to load contact profile '%s' (add contact_profiles block to ~/.zonekit.yaml): %w", profileName, err)
+		}
+
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
+		if err != nil {
+			return err
+		}
+		cmdutil.DisplayAccountInfo(accountConfig)
+
+		domainService, err := domain.NewService(client)
+		if err != nil {
+			return fmt.Errorf("failed to create domain service: %w", err)
+		}
+		
+		cInfo := model.ContactInfo{
+			FirstName:      profile.FirstName,
+			LastName:       profile.LastName,
+			Address:        profile.Address,
+			City:           profile.City,
+			StateProvince:  profile.StateProvince,
+			PostalCode:     profile.PostalCode,
+			Country:        profile.Country,
+			Phone:          profile.Phone,
+			Email:          profile.Email,
+		}
+
+		req := model.RegistrationRequest{
+			DomainName: domainName,
+			Years:      years,
+			Registrant: cInfo,
+			Tech:       cInfo,
+			Admin:      cInfo,
+			AuxBilling: cInfo,
+		}
+
+		err = domainService.RegisterDomain(cmd.Context(), req)
+		pkgclient.LogAuditEvent(accountName, accountConfig.Provider, "RegisterDomain", domainName, err)
+		if err != nil {
+			return fmt.Errorf("failed to register domain: %w", err)
+		}
+
+		fmt.Printf("Successfully registered %s for %d year(s).\n", domainName, years)
 		return nil
 	},
 }
@@ -148,8 +234,11 @@ var domainCheckCmd = &cobra.Command{
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
 
-		domainService := domain.NewService(client)
-		available, err := domainService.CheckAvailability(domainName)
+		domainService, err := domain.NewService(client)
+		if err != nil {
+			return fmt.Errorf("failed to create domain service: %w", err)
+		}
+		available, err := domainService.CheckAvailability(cmd.Context(), domainName)
 		if err != nil {
 			return fmt.Errorf("failed to check domain availability: %w", err)
 		}
@@ -198,8 +287,11 @@ var domainNameserversGetCmd = &cobra.Command{
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
 
-		domainService := domain.NewService(client)
-		nameservers, err := domainService.GetNameservers(domainName)
+		domainService, err := domain.NewService(client)
+		if err != nil {
+			return fmt.Errorf("failed to create domain service: %w", err)
+		}
+		nameservers, err := domainService.GetNameservers(cmd.Context(), domainName)
 		if err != nil {
 			return fmt.Errorf("failed to get nameservers: %w", err)
 		}
@@ -236,8 +328,11 @@ var domainNameserversSetCmd = &cobra.Command{
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
 
-		domainService := domain.NewService(client)
-		err = domainService.SetNameservers(domainName, nameservers)
+		domainService, err := domain.NewService(client)
+		if err != nil {
+			return fmt.Errorf("failed to create domain service: %w", err)
+		}
+		err = domainService.SetNameservers(cmd.Context(), domainName, nameservers)
 		if err != nil {
 			return fmt.Errorf("failed to set nameservers: %w", err)
 		}
@@ -278,8 +373,11 @@ var domainNameserversDefaultCmd = &cobra.Command{
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
 
-		domainService := domain.NewService(client)
-		err = domainService.SetToNamecheapDNS(domainName)
+		domainService, err := domain.NewService(client)
+		if err != nil {
+			return fmt.Errorf("failed to create domain service: %w", err)
+		}
+		err = domainService.SetDefaultNameservers(cmd.Context(), domainName)
 		if err != nil {
 			return fmt.Errorf("failed to set to provider DNS: %w", err)
 		}
@@ -289,7 +387,123 @@ var domainNameserversDefaultCmd = &cobra.Command{
 	},
 }
 
-// domainRenewCmd represents the domain renew command
+// domainDnssecCmd represents the domain dnssec command
+var domainDnssecCmd = &cobra.Command{
+	Use:   "dnssec",
+	Short: "Manage DNSSEC for a domain",
+	Long:  `Enable, disable, or check the status of DNSSEC for a domain.`,
+}
+
+var domainDnssecEnableCmd = &cobra.Command{
+	Use:   "enable <domain>",
+	Short: "Enable DNSSEC",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		domainName := args[0]
+		
+		configManager, err := config.NewManager()
+		if err != nil {
+			return err
+		}
+		accountConfig, err := configManager.GetCurrentAccount()
+		if err != nil {
+			return err
+		}
+		client, err := cmdutil.CreateClient(accountConfig)
+		if err != nil {
+			return err
+		}
+
+		domainService, err := domain.NewService(client)
+		if err != nil {
+			return fmt.Errorf("failed to create domain service: %w", err)
+		}
+
+		err = domainService.EnableDNSSEC(cmd.Context(), domainName)
+		pkgclient.LogAuditEvent(accountConfig.Username, accountConfig.Provider, "EnableDNSSEC", domainName, err)
+		if err != nil {
+			return fmt.Errorf("failed to enable DNSSEC: %w", err)
+		}
+
+		fmt.Printf("Successfully enabled DNSSEC for %s\n", domainName)
+		return nil
+	},
+}
+
+var domainDnssecDisableCmd = &cobra.Command{
+	Use:   "disable <domain>",
+	Short: "Disable DNSSEC",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		domainName := args[0]
+		
+		configManager, err := config.NewManager()
+		if err != nil {
+			return err
+		}
+		accountConfig, err := configManager.GetCurrentAccount()
+		if err != nil {
+			return err
+		}
+		client, err := cmdutil.CreateClient(accountConfig)
+		if err != nil {
+			return err
+		}
+
+		domainService, err := domain.NewService(client)
+		if err != nil {
+			return fmt.Errorf("failed to create domain service: %w", err)
+		}
+
+		err = domainService.DisableDNSSEC(cmd.Context(), domainName)
+		pkgclient.LogAuditEvent(accountConfig.Username, accountConfig.Provider, "DisableDNSSEC", domainName, err)
+		if err != nil {
+			return fmt.Errorf("failed to disable DNSSEC: %w", err)
+		}
+
+		fmt.Printf("Successfully disabled DNSSEC for %s\n", domainName)
+		return nil
+	},
+}
+
+var domainDnssecStatusCmd = &cobra.Command{
+	Use:   "status <domain>",
+	Short: "Get DNSSEC status",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		domainName := args[0]
+		
+		configManager, err := config.NewManager()
+		if err != nil {
+			return err
+		}
+		accountConfig, err := configManager.GetCurrentAccount()
+		if err != nil {
+			return err
+		}
+		client, err := cmdutil.CreateClient(accountConfig)
+		if err != nil {
+			return err
+		}
+
+		domainService, err := domain.NewService(client)
+		if err != nil {
+			return fmt.Errorf("failed to create domain service: %w", err)
+		}
+
+		status, err := domainService.GetDNSSECStatus(cmd.Context(), domainName)
+		if err != nil {
+			return fmt.Errorf("failed to get DNSSEC status: %w", err)
+		}
+
+		if status {
+			fmt.Printf("DNSSEC is ENABLED for %s\n", domainName)
+		} else {
+			fmt.Printf("DNSSEC is DISABLED for %s\n", domainName)
+		}
+		return nil
+	},
+}
 var domainRenewCmd = &cobra.Command{
 	Use:   "renew <domain> [years]",
 	Short: "Renew a domain",
@@ -319,8 +533,12 @@ var domainRenewCmd = &cobra.Command{
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
 
-		domainService := domain.NewService(client)
-		err = domainService.RenewDomain(domainName, years)
+		domainService, err := domain.NewService(client)
+		if err != nil {
+			return fmt.Errorf("failed to create domain service: %w", err)
+		}
+		err = domainService.RenewDomain(cmd.Context(), domainName, years)
+		pkgclient.LogAuditEvent(accountConfig.Username, accountConfig.Provider, "RenewDomain", domainName, err)
 		if err != nil {
 			return fmt.Errorf("failed to renew domain: %w", err)
 		}
@@ -347,8 +565,17 @@ func init() {
 	domainCmd.AddCommand(domainListCmd)
 	domainCmd.AddCommand(domainInfoCmd)
 	domainCmd.AddCommand(domainCheckCmd)
+	domainCmd.AddCommand(domainRegisterCmd)
 	domainCmd.AddCommand(domainNameserversCmd)
+	domainCmd.AddCommand(domainDnssecCmd)
 	domainCmd.AddCommand(domainRenewCmd)
+
+	domainDnssecCmd.AddCommand(domainDnssecEnableCmd)
+	domainDnssecCmd.AddCommand(domainDnssecDisableCmd)
+	domainDnssecCmd.AddCommand(domainDnssecStatusCmd)
+
+	domainRegisterCmd.Flags().IntP("years", "y", 1, "Number of years to register the domain")
+	domainRegisterCmd.Flags().StringP("contact-profile", "p", "default", "Contact profile from config to use for registration")
 
 	domainNameserversCmd.AddCommand(domainNameserversGetCmd)
 	domainNameserversCmd.AddCommand(domainNameserversSetCmd)

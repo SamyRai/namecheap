@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.3.0-blue?style=flat-square)
 ![Status](https://img.shields.io/badge/status-stable-green?style=flat-square)
 ![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat-square&logo=go)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
@@ -21,7 +21,7 @@ A command-line interface for managing DNS zones and records across multiple prov
 >
 > **This is an independent, community-maintained project.**
 >
-> **Current Status: v2.0.0 Release**
+> **Current Status: v2.3.0 Release**
 >
 > This tool has undergone a major refactor (Provider Contract v2) and is considered stable for general use. However:
 >
@@ -43,11 +43,12 @@ A command-line interface for managing DNS zones and records across multiple prov
 | **Multi-Provider Support**   | Unified interface for Namecheap, Cloudflare, DigitalOcean, GoDaddy, and more |
 | **Multi-Account Management** | Configure and switch between multiple provider accounts seamlessly           |
 | **Universal DNS API**        | Consistent commands regardless of the underlying provider                    |
-| **Domain Management**        | List, check, and manage your domains                                         |
+| **Domain Management**        | List, check, register, and renew your domains                                |
 | **DNS Management**           | Create, update, and delete DNS records with ID support                       |
 | **Bulk Operations**          | Perform atomic or orchestrated bulk updates                                  |
 | **Extensible Architecture**  | Easy to add new providers via OpenAPI or custom adapters                     |
-| **Secure Configuration**     | API keys and credentials stored securely                                     |
+| **Secure Authentication**    | OAuth flows and OS Keyring integration for secure credential storage         |
+| **Audit Logging**            | Automatically log mutating infrastructure operations to `~/.zonekit/audit.log`|
 
 ## Quick Start
 
@@ -129,10 +130,21 @@ The tool automatically detects configuration files in this priority order:
 | `domain list`                                    | List all domains   |
 | `domain info <domain>`                           | Get domain details |
 | `domain check <domain>`                          | Check availability |
+| `domain register <domain>`                       | Register new domain|
 | `domain renew <domain> [years]`                  | Renew domain       |
+| `domain dnssec <enable|disable|status> <domain>` | Manage DNSSEC      |
 | `domain nameservers get <domain>`                | Get nameservers    |
 | `domain nameservers set <domain> <ns1> [ns2]...` | Set nameservers    |
 | `domain nameservers default <domain>`            | Reset to default   |
+
+</details>
+
+<details>
+<summary><strong>Authentication</strong></summary>
+
+| Command                                          | Description        |
+| ------------------------------------------------ | ------------------ |
+| `auth login <provider>`                          | Login via OAuth    |
 
 </details>
 
@@ -154,12 +166,12 @@ The tool automatically detects configuration files in this priority order:
 
 > **For complete command reference, see [Usage Guide](https://github.com/SamyRai/zonekit/wiki/Usage)**
 
-## Security
+## Security & Audit
 
+- **OS Keyring Integration**: API keys and OAuth tokens are stored natively in the secure OS keychain instead of plain text configuration files.
+- **Audit Logging**: All mutating API actions are automatically recorded in JSON format to `~/.zonekit/audit.log`.
 - Configuration files use `600` permissions (owner read/write only)
 - API keys are masked in output
-- Configuration files are excluded from git by default
-- Sensitive data is encrypted in memory
 
 ## Configuration File Locations
 

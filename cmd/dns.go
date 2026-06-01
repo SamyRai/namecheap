@@ -401,17 +401,61 @@ var dnsImportCmd = &cobra.Command{
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
-		fmt.Println()
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
+		if err != nil {
+			return err
+		}
+		cmdutil.DisplayAccountInfo(accountConfig)
 
-		// TODO: Implement zone file import
-		// This would involve:
-		// 1. Parsing the zone file format
-		// 2. Converting to DNS records
-		// 3. Setting all records at once
+		dnsService := dns.NewService(client)
 
-		return fmt.Errorf("zone file import not yet implemented - TODO: parse %s and import to %s", zoneFile, domainName)
+		replace, _ := cmd.Flags().GetBool("replace")
+
+		records, err := dns.ParseZoneFile(zoneFile, domainName)
+		if err != nil {
+			return fmt.Errorf("failed to parse zone file: %w", err)
+		}
+
+		if replace {
+			fmt.Printf("Replacing all records for %s with %d records from %s\n", domainName, len(records), zoneFile)
+			err = dnsService.SetRecords(domainName, records)
+		} else {
+			fmt.Printf("Adding/updating %d records for %s from %s\n", len(records), domainName, zoneFile)
+			existingRecords, err := dnsService.GetRecords(domainName)
+			if err != nil {
+				return fmt.Errorf("failed to get existing records: %w", err)
+			}
+
+			// Build a map of existing records for quick lookup
+			existingMap := make(map[string]bool)
+			for _, er := range existingRecords {
+				key := fmt.Sprintf("%s:%s", er.HostName, er.RecordType)
+				existingMap[key] = true
+			}
+
+			var ops []dns.BulkOperation
+			for _, rec := range records {
+				key := fmt.Sprintf("%s:%s", rec.HostName, rec.RecordType)
+				action := dns.BulkActionAdd
+				if existingMap[key] {
+					action = dns.BulkActionUpdate
+				}
+				ops = append(ops, dns.BulkOperation{
+					Action: action,
+					Record: rec,
+				})
+			}
+
+			err = dnsService.BulkUpdate(domainName, ops)
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to import zone file: %w", err)
+		}
+
+		fmt.Printf("✅ Successfully imported records from %s to %s\n", zoneFile, domainName)
+		return nil
 	},
 }
 
@@ -495,26 +539,36 @@ func init() {
 
 	// Flags for dns bulk
 	dnsBulkCmd.Flags().BoolP("confirm", "y", false, "Confirm the bulk operations")
+
+	// Flags for dns import
+	dnsImportCmd.Flags().BoolP("replace", "r", false, "Replace all existing records with the imported records")
 }
 
 // formatAsZoneFile converts DNS records to BIND zone file format
 func formatAsZoneFile(domainName string, records []dnsrecord.Record) string {
 	var sb strings.Builder
 
-	// Write SOA record (placeholder - would need proper SOA data)
+	// Find NS records to use for SOA
+	primaryNS := "ns1.provider.com."
+	for _, rec := range records {
+		if rec.RecordType == dnsrecord.RecordTypeNS && (rec.HostName == "@" || rec.HostName == "") {
+			primaryNS = rec.Address
+			if !strings.HasSuffix(primaryNS, ".") {
+				primaryNS += "."
+			}
+			break
+		}
+	}
+
+	// Write SOA record
 	sb.WriteString(fmt.Sprintf("$ORIGIN %s.\n", domainName))
-	sb.WriteString(fmt.Sprintf("@ IN SOA ns1.namecheap.com. admin.%s. (\n", domainName))
+	sb.WriteString(fmt.Sprintf("@ IN SOA %s admin.%s. (\n", primaryNS, domainName))
 	sb.WriteString("\t1 ; serial\n")
 	sb.WriteString("\t3600 ; refresh\n")
 	sb.WriteString("\t1800 ; retry\n")
 	sb.WriteString("\t604800 ; expire\n")
 	sb.WriteString("\t3600 ; minimum TTL\n")
 	sb.WriteString(")\n\n")
-
-	// Write NS records (placeholder)
-	sb.WriteString("; Name servers\n")
-	sb.WriteString("@ IN NS ns1.namecheap.com.\n")
-	sb.WriteString("@ IN NS ns2.namecheap.com.\n\n")
 
 	// Write other records
 	for _, record := range records {

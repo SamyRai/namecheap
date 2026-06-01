@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/zalando/go-keyring"
 	"gopkg.in/yaml.v3"
 )
 
@@ -14,17 +16,31 @@ type AccountConfig struct {
 	// Defaults to "namecheap" if not specified for backward compatibility
 	Provider    string `yaml:"provider,omitempty" mapstructure:"provider,omitempty"`
 	Username    string `yaml:"username" mapstructure:"username"`
-	APIUser     string `yaml:"api_user" mapstructure:"api_user"`
-	APIKey      string `yaml:"api_key" mapstructure:"api_key"`
-	ClientIP    string `yaml:"client_ip" mapstructure:"client_ip"`
+	APIUser     string `yaml:"api_user,omitempty" mapstructure:"api_user,omitempty"`
+	APIKey      string `yaml:"api_key,omitempty" mapstructure:"api_key,omitempty"`
+	ClientIP    string `yaml:"client_ip,omitempty" mapstructure:"client_ip,omitempty"`
 	UseSandbox  bool   `yaml:"use_sandbox" mapstructure:"use_sandbox"`
 	Description string `yaml:"description" mapstructure:"description"`
 }
 
+// ContactProfile represents a contact profile for domain registration
+type ContactProfile struct {
+	FirstName      string `yaml:"first_name" mapstructure:"first_name"`
+	LastName       string `yaml:"last_name" mapstructure:"last_name"`
+	Address        string `yaml:"address" mapstructure:"address"`
+	City           string `yaml:"city" mapstructure:"city"`
+	StateProvince  string `yaml:"state_province" mapstructure:"state_province"`
+	PostalCode     string `yaml:"postal_code" mapstructure:"postal_code"`
+	Country        string `yaml:"country" mapstructure:"country"`
+	Phone          string `yaml:"phone" mapstructure:"phone"`
+	Email          string `yaml:"email" mapstructure:"email"`
+}
+
 // Config represents the complete configuration structure
 type Config struct {
-	Accounts       map[string]*AccountConfig `yaml:"accounts" mapstructure:"accounts"`
-	CurrentAccount string                    `yaml:"current_account" mapstructure:"current_account"`
+	Accounts        map[string]*AccountConfig  `yaml:"accounts" mapstructure:"accounts"`
+	CurrentAccount  string                     `yaml:"current_account" mapstructure:"current_account"`
+	ContactProfiles map[string]*ContactProfile `yaml:"contact_profiles,omitempty" mapstructure:"contact_profiles,omitempty"`
 }
 
 // Manager handles configuration operations
@@ -88,11 +104,62 @@ func (m *Manager) Load() error {
 		return err
 	}
 
-	return yaml.Unmarshal(data, m.config)
+	if err := yaml.Unmarshal(data, m.config); err != nil {
+		return err
+	}
+
+	// Try to load secrets from keyring for all accounts
+	for name, account := range m.config.Accounts {
+		m.LoadSecretsFromKeyring(name, account)
+		// Check environment variables as fallback
+		if account.APIKey == "" {
+			account.APIKey = os.Getenv("ZONEKIT_" + strings.ToUpper(name) + "_API_KEY")
+		}
+		if account.APIUser == "" {
+			account.APIUser = os.Getenv("ZONEKIT_" + strings.ToUpper(name) + "_API_USER")
+		}
+	}
+
+	return nil
+}
+
+// LoadSecretsFromKeyring populates account credentials from OS keyring if available
+func (m *Manager) LoadSecretsFromKeyring(name string, account *AccountConfig) {
+	key, err := keyring.Get("zonekit", name+"_api_key")
+	if err == nil && key != "" {
+		account.APIKey = key
+	}
+	user, err := keyring.Get("zonekit", name+"_api_user")
+	if err == nil && user != "" {
+		account.APIUser = user
+	}
+}
+
+// SaveSecretsToKeyring saves account credentials to OS keyring and removes them from account config to avoid writing to yaml
+func (m *Manager) SaveSecretsToKeyring(name string, account *AccountConfig) error {
+	if account.APIKey != "" {
+		err := keyring.Set("zonekit", name+"_api_key", account.APIKey)
+		if err != nil {
+			return fmt.Errorf("failed to save API Key to keyring: %w", err)
+		}
+		// Clear it from yaml config
+		account.APIKey = ""
+	}
+	if account.APIUser != "" {
+		err := keyring.Set("zonekit", name+"_api_user", account.APIUser)
+		if err != nil {
+			return fmt.Errorf("failed to save API User to keyring: %w", err)
+		}
+		// Clear it from yaml config
+		account.APIUser = ""
+	}
+	return nil
 }
 
 // Save writes the configuration to file
 func (m *Manager) Save() error {
+	// Ensure we don't marshal raw secrets if they are supposed to be in keyring
+	// For backward compatibility, we marshal them if they are still in the struct
 	data, err := yaml.Marshal(m.config)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
@@ -134,6 +201,20 @@ func (m *Manager) GetAccount(name string) (*AccountConfig, error) {
 	}
 
 	return account, nil
+}
+
+// GetContactProfile returns a specific contact profile by name
+func (m *Manager) GetContactProfile(name string) (*ContactProfile, error) {
+	if m.config.ContactProfiles == nil {
+		return nil, fmt.Errorf("no contact profiles configured")
+	}
+	
+	profile, exists := m.config.ContactProfiles[name]
+	if !exists {
+		return nil, fmt.Errorf("contact profile '%s' not found", name)
+	}
+
+	return profile, nil
 }
 
 // SetCurrentAccount changes the currently selected account
