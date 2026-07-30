@@ -21,12 +21,36 @@ type Config struct {
 
 // Records defines all DNS records for a service integration
 type Records struct {
+	// Ownership is the provider's domain-verification record. Providers such as
+	// Migadu keep a domain's mail capability disabled until it resolves, so it
+	// belongs to the required set rather than being a nicety. Its value is
+	// per-domain, so it carries a {token} placeholder supplied at setup time
+	// via --var.
+	Ownership    *TXTRecord          `yaml:"ownership,omitempty"`
 	MX           []MXRecord          `yaml:"mx,omitempty"`
 	SPF          *TXTRecord          `yaml:"spf,omitempty"`
 	DKIM         []DKIMRecord        `yaml:"dkim,omitempty"`
 	DMARC        *TXTRecord          `yaml:"dmarc,omitempty"`
 	Autodiscover *AutodiscoverRecord `yaml:"autodiscover,omitempty"`
-	Custom       []CustomRecord      `yaml:"custom,omitempty"`
+	// SRV holds generic service-discovery records (submission, IMAP, POP3,
+	// Outlook autodiscover). Optional per provider docs, but part of a complete
+	// client-autoconfiguration setup.
+	SRV []SRVRecord `yaml:"srv,omitempty"`
+	// WildcardMX is published only when explicitly requested (--with-wildcard-mx)
+	// because it changes delivery semantics for every subdomain.
+	WildcardMX []MXRecord     `yaml:"wildcard_mx,omitempty"`
+	Custom     []CustomRecord `yaml:"custom,omitempty"`
+}
+
+// SRVRecord represents an SRV service-discovery record. Hostname is the full
+// _service._proto label (e.g. "_imaps._tcp"); Target is the host providing it.
+type SRVRecord struct {
+	Hostname string `yaml:"hostname"`
+	Target   string `yaml:"target"`
+	Port     int    `yaml:"port"`
+	Priority int    `yaml:"priority"`
+	Weight   int    `yaml:"weight"`
+	TTL      int    `yaml:"ttl,omitempty"`
 }
 
 // MXRecord represents an MX record

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"testing"
 
 	"zonekit/pkg/dns"
@@ -103,7 +104,8 @@ func TestSetupReplacePreservesUnrelatedRecords(t *testing.T) {
 		t.Error("missing the MX record the service owns")
 	}
 
-	// The stale SPF is superseded by the new one -- exactly one apex SPF.
+	// Exactly one apex SPF survives (RFC 7208 allows only one), and it extends
+	// the existing policy rather than discarding it.
 	var spf []string
 	for _, r := range f.written {
 		if r.HostName == "@" && r.RecordType == "TXT" && txtKind(r.Address) == "spf" {
@@ -113,8 +115,10 @@ func TestSetupReplacePreservesUnrelatedRecords(t *testing.T) {
 	if len(spf) != 1 {
 		t.Fatalf("expected exactly one apex SPF after replace, got %d: %v", len(spf), spf)
 	}
-	if spf[0] != "v=spf1 include:spf.migadu.com -all" {
-		t.Errorf("apex SPF not superseded, got %q", spf[0])
+	for _, want := range []string{"include:spf.migadu.com", "include:old", "~all"} {
+		if !strings.Contains(spf[0], want) {
+			t.Errorf("merged SPF %q lost %q", spf[0], want)
+		}
 	}
 }
 
@@ -135,11 +139,17 @@ func TestSetupReplacePreservesUnrelatedTXTAtSameHost(t *testing.T) {
 		if r.HostName != "@" || r.RecordType != "TXT" {
 			continue
 		}
-		switch r.Address {
-		case "google-site-verification=zRNLAhp1gv":
+		switch {
+		case r.Address == "google-site-verification=zRNLAhp1gv":
 			google++
-		case "v=spf1 include:spf.migadu.com -all":
+		case txtKind(r.Address) == "spf":
 			migaduSPF++
+			// The pre-existing forwarding sender must survive the merge.
+			for _, want := range []string{"include:spf.migadu.com", "include:spf.efwd.registrar-servers.com"} {
+				if !strings.Contains(r.Address, want) {
+					t.Errorf("merged SPF %q lost %q", r.Address, want)
+				}
+			}
 		default:
 			t.Errorf("unexpected leftover apex TXT: %q", r.Address)
 		}
@@ -148,7 +158,7 @@ func TestSetupReplacePreservesUnrelatedTXTAtSameHost(t *testing.T) {
 		t.Errorf("google-site-verification TXT dropped (got %d copies)", google)
 	}
 	if migaduSPF != 1 {
-		t.Errorf("expected exactly one migadu SPF TXT, got %d", migaduSPF)
+		t.Errorf("expected exactly one apex SPF TXT, got %d", migaduSPF)
 	}
 }
 

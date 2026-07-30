@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"zonekit/internal/cmdutil"
@@ -118,6 +119,26 @@ var serviceSetupCmd = &cobra.Command{
 		if cmd.Flags().Changed("replace") {
 			val, _ := cmd.Flags().GetBool("replace")
 			flags["replace"] = val
+		}
+		if cmd.Flags().Changed("force-policy") {
+			val, _ := cmd.Flags().GetBool("force-policy")
+			flags["force-policy"] = val
+		}
+		if cmd.Flags().Changed("with-wildcard-mx") {
+			val, _ := cmd.Flags().GetBool("with-wildcard-mx")
+			flags["with-wildcard-mx"] = val
+		}
+		if cmd.Flags().Changed("var") {
+			pairs, _ := cmd.Flags().GetStringArray("var")
+			vars := make(map[string]string, len(pairs))
+			for _, pair := range pairs {
+				k, v, found := strings.Cut(pair, "=")
+				if !found {
+					return fmt.Errorf("invalid --var %q: expected key=value", pair)
+				}
+				vars[strings.TrimSpace(k)] = v
+			}
+			flags["vars"] = vars
 		}
 
 		// Get service plugin
@@ -268,5 +289,11 @@ func init() {
 	// Flags
 	serviceSetupCmd.Flags().Bool("dry-run", false, "Show what would be done without making changes")
 	serviceSetupCmd.Flags().Bool("replace", false, "Replace existing records")
+	serviceSetupCmd.Flags().StringArray("var", nil,
+		"Per-domain template value as key=value (repeatable), e.g. --var token=abc123")
+	serviceSetupCmd.Flags().Bool("force-policy", false,
+		"Overwrite existing SPF/DMARC policies instead of extending them")
+	serviceSetupCmd.Flags().Bool("with-wildcard-mx", false,
+		"Also publish wildcard MX records (subdomain addressing), when the service defines them")
 	serviceRemoveCmd.Flags().BoolP("confirm", "y", false, "Confirm the operation")
 }

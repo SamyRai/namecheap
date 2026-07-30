@@ -116,6 +116,136 @@ func txtKind(value string) string {
 	}
 }
 
+// mergePolicyRecords rewrites the service's SPF and DMARC records so they
+// extend what the zone already publishes instead of replacing it.
+//
+// Migadu's own instructions say that if a domain already has an SPF policy you
+// want to keep, you add just the include: mechanism to it rather than swapping
+// the record -- and a domain may only carry one SPF policy. The same reasoning
+// applies to DMARC: an existing policy commonly carries an rua= reporting
+// address that a template's bare "v=DMARC1; p=quarantine;" would silently drop,
+// leaving the domain with a stricter policy and no way to see its effect.
+//
+// Returns the adjusted service records. force skips merging entirely.
+func mergePolicyRecords(records, existing []dnsrecord.Record, force bool) []dnsrecord.Record {
+	if force {
+		return records
+	}
+	out := make([]dnsrecord.Record, len(records))
+	copy(out, records)
+	for i, r := range out {
+		if r.RecordType != dnsrecord.RecordTypeTXT {
+			continue
+		}
+		kind := txtKind(r.Address)
+		if kind != "spf" && kind != "dmarc" {
+			continue
+		}
+		for _, e := range existing {
+			if e.HostName != r.HostName || e.RecordType != dnsrecord.RecordTypeTXT ||
+				txtKind(e.Address) != kind {
+				continue
+			}
+			if kind == "spf" {
+				out[i].Address = mergeSPF(e.Address, r.Address)
+			} else {
+				out[i].Address = mergeDMARC(e.Address, r.Address)
+			}
+			break
+		}
+	}
+	return out
+}
+
+// mergeSPF splices the service's include: mechanisms into an existing policy,
+// preserving the existing qualifier (~all / -all) and any other senders the
+// domain already authorizes. Per RFC 7208 a domain may publish only one SPF
+// record, so extending in place is the only correct move.
+func mergeSPF(existing, service string) string {
+	existingFields := strings.Fields(strings.Trim(existing, `"`))
+	serviceFields := strings.Fields(strings.Trim(service, `"`))
+
+	have := make(map[string]bool, len(existingFields))
+	for _, f := range existingFields {
+		have[strings.ToLower(f)] = true
+	}
+
+	// Collect the mechanisms the service contributes, minus the version tag and
+	// the trailing all-qualifier, which stay owned by the existing policy.
+	var add []string
+	for _, f := range serviceFields {
+		lf := strings.ToLower(f)
+		if lf == "v=spf1" || strings.HasSuffix(lf, "all") || have[lf] {
+			continue
+		}
+		add = append(add, f)
+	}
+	if len(add) == 0 {
+		return existing
+	}
+
+	// Insert directly after v=spf1, as Migadu's documentation specifies.
+	var merged []string
+	inserted := false
+	for _, f := range existingFields {
+		merged = append(merged, f)
+		if !inserted && strings.EqualFold(f, "v=spf1") {
+			merged = append(merged, add...)
+			inserted = true
+		}
+	}
+	if !inserted {
+		merged = append([]string{"v=spf1"}, append(add, merged...)...)
+	}
+	return strings.Join(merged, " ")
+}
+
+// mergeDMARC keeps every tag the existing policy defines (notably rua/ruf
+// reporting addresses and pct), while adopting the service's policy strength
+// for tags the domain does not already set.
+func mergeDMARC(existing, service string) string {
+	parse := func(s string) ([]string, map[string]string) {
+		var order []string
+		out := map[string]string{}
+		for _, part := range strings.Split(strings.Trim(s, `"`), ";") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			k, v, found := strings.Cut(part, "=")
+			if !found {
+				continue
+			}
+			k = strings.ToLower(strings.TrimSpace(k))
+			if _, dup := out[k]; !dup {
+				order = append(order, k)
+			}
+			out[k] = strings.TrimSpace(v)
+		}
+		return order, out
+	}
+
+	existingOrder, existingTags := parse(existing)
+	serviceOrder, serviceTags := parse(service)
+	if len(existingTags) == 0 {
+		return service
+	}
+
+	// Start from the existing policy, then append any tag the service defines
+	// that the domain does not already carry.
+	merged := make([]string, 0, len(existingOrder)+len(serviceOrder))
+	for _, k := range existingOrder {
+		merged = append(merged, k+"="+existingTags[k])
+	}
+	for _, k := range serviceOrder {
+		if _, ok := existingTags[k]; ok {
+			continue
+		}
+		merged = append(merged, k+"="+serviceTags[k])
+	}
+	return strings.Join(merged, "; ") + ";"
+}
+
 // setup implements the setup command
 func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 	if len(ctx.Args) < 2 {
@@ -132,6 +262,9 @@ func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 
 	dryRun, _ := ctx.Flags["dry-run"].(bool)
 	replace, _ := ctx.Flags["replace"].(bool)
+	forcePolicy, _ := ctx.Flags["force-policy"].(bool)
+	withWildcard, _ := ctx.Flags["with-wildcard-mx"].(bool)
+	vars, _ := ctx.Flags["vars"].(map[string]string)
 
 	// Always read the current zone, even with --replace. Providers apply this
 	// through a whole-zone write (Namecheap's setHosts replaces the entire
@@ -145,7 +278,22 @@ func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 	}
 
 	// Generate DNS records from config
-	records := p.generateRecords(config, domain)
+	records := p.generateRecordsWithOpts(config, domain, generateOpts{
+		Vars:         vars,
+		WithWildcard: withWildcard,
+	})
+
+	// Fail closed on unresolved placeholders. Publishing a literal "{token}"
+	// would report success while leaving the domain unverified -- for Migadu
+	// that means mail silently stays disabled.
+	if missing := unresolvedPlaceholders(records); len(missing) > 0 {
+		return fmt.Errorf(
+			"missing value(s) for %s: supply with --var %s=<value> (see the provider's per-domain setup page)",
+			strings.Join(missing, ", "), missing[0])
+	}
+
+	// Extend existing SPF/DMARC policies rather than clobbering them.
+	records = mergePolicyRecords(records, existingRecords, forcePolicy)
 
 	ctx.Output.Printf("Setting up %s DNS records for %s\n", config.DisplayName, domain)
 	ctx.Output.Println("=====================================")
@@ -487,7 +635,106 @@ func (p *ServicePlugin) info(ctx *plugin.Context) error {
 
 // generateRecords generates DNS records from a service integration configuration
 func (p *ServicePlugin) generateRecords(config *Config, domainName string) []dnsrecord.Record {
+	return p.generateRecordsWithOpts(config, domainName, generateOpts{})
+}
+
+// generateOpts carries per-invocation inputs that a static template cannot
+// know: caller-supplied variables and opt-in record groups.
+type generateOpts struct {
+	Vars         map[string]string
+	WithWildcard bool
+}
+
+// expandPlaceholders substitutes {domain} plus any caller-supplied variables.
+// Unresolved placeholders are deliberately left intact so callers can detect
+// them and refuse to publish -- writing a literal "{token}" into DNS would
+// look like success while leaving the domain unverified.
+func expandPlaceholders(value, domainName string, vars map[string]string) string {
+	value = strings.ReplaceAll(value, "{domain}", domainName)
+	for k, v := range vars {
+		value = strings.ReplaceAll(value, "{"+k+"}", v)
+	}
+	return value
+}
+
+// unresolvedPlaceholders returns the names of any {name} tokens still present
+// in the generated records.
+func unresolvedPlaceholders(records []dnsrecord.Record) []string {
+	var missing []string
+	seen := map[string]bool{}
+	for _, r := range records {
+		rest := r.Address
+		for {
+			open := strings.Index(rest, "{")
+			if open < 0 {
+				break
+			}
+			end := strings.Index(rest[open:], "}")
+			if end < 0 {
+				break
+			}
+			name := rest[open+1 : open+end]
+			if name != "" && !seen[name] {
+				seen[name] = true
+				missing = append(missing, name)
+			}
+			rest = rest[open+end+1:]
+		}
+	}
+	return missing
+}
+
+func (p *ServicePlugin) generateRecordsWithOpts(config *Config, domainName string, opts generateOpts) []dnsrecord.Record {
 	var records []dnsrecord.Record
+
+	// Ownership / domain-verification record.
+	if own := config.Records.Ownership; own != nil {
+		ttl := own.TTL
+		if ttl == 0 {
+			ttl = dns.DefaultTTL
+		}
+		records = append(records, dnsrecord.Record{
+			HostName:   own.Hostname,
+			RecordType: dnsrecord.RecordTypeTXT,
+			Address:    expandPlaceholders(own.Value, domainName, opts.Vars),
+			TTL:        ttl,
+		})
+	}
+
+	// SRV service-discovery records.
+	for _, srv := range config.Records.SRV {
+		ttl := srv.TTL
+		if ttl == 0 {
+			ttl = dns.DefaultTTL
+		}
+		records = append(records, dnsrecord.Record{
+			HostName:   srv.Hostname,
+			RecordType: dnsrecord.RecordTypeSRV,
+			Target:     ensureTrailingDot(srv.Target),
+			Port:       srv.Port,
+			Priority:   srv.Priority,
+			Weight:     srv.Weight,
+			TTL:        ttl,
+		})
+	}
+
+	// Wildcard MX for subdomain addressing -- opt-in, since it changes
+	// delivery for every subdomain of the zone.
+	if opts.WithWildcard {
+		for _, mx := range config.Records.WildcardMX {
+			ttl := mx.TTL
+			if ttl == 0 {
+				ttl = dns.DefaultTTL
+			}
+			records = append(records, dnsrecord.Record{
+				HostName:   mx.Hostname,
+				RecordType: dnsrecord.RecordTypeMX,
+				Address:    ensureTrailingDot(mx.Server),
+				TTL:        ttl,
+				MXPref:     mx.Priority,
+			})
+		}
+	}
 
 	// MX Records
 	for _, mx := range config.Records.MX {
@@ -524,9 +771,7 @@ func (p *ServicePlugin) generateRecords(config *Config, domainName string) []dns
 		if ttl == 0 {
 			ttl = dns.DefaultTTL
 		}
-		value := dkim.Value
-		// Replace {domain} placeholder if present
-		value = strings.ReplaceAll(value, "{domain}", domainName)
+		value := expandPlaceholders(dkim.Value, domainName, opts.Vars)
 
 		recordType := dnsrecord.RecordTypeCNAME
 		if dkim.Type == "TXT" {

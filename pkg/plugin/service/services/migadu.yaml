@@ -3,7 +3,20 @@ display_name: Migadu
 description: Migadu email hosting setup and management
 category: email
 
+# Mirrors Migadu's per-domain "DNS Setup Instructions" page. Ordering below
+# follows that page: ownership, MX, DKIM, SPF, DMARC, subdomain addressing,
+# autoconfiguration.
 records:
+  # Migadu verifies domain ownership before enabling mail, and the domain stays
+  # at state=inactive / can_send=false until this resolves -- MX, SPF and DKIM
+  # alone are not enough. The token is unique per domain and is shown on that
+  # domain's instructions page (it is NOT exposed by the Admin API), so it is
+  # supplied at setup time:
+  #   zonekit service setup migadu example.com --var token=abc12345
+  ownership:
+    hostname: "@"
+    value: "hosted-email-verify={token}"
+
   mx:
     - hostname: "@"
       server: aspmx1.migadu.com
@@ -12,10 +25,8 @@ records:
       server: aspmx2.migadu.com
       priority: 20
 
-  spf:
-    hostname: "@"
-    value: "v=spf1 include:spf.migadu.com -all"
-
+  # DKIM+ARC. Only one key pair is active at a time; the other two exist so
+  # Migadu can rotate keys without a DNS change on our side.
   dkim:
     - hostname: key1._domainkey
       type: CNAME
@@ -27,17 +38,66 @@ records:
       type: CNAME
       value: key3.{domain}._domainkey.migadu.com
 
-  dmarc:
+  # A domain may publish only one SPF policy (RFC 7208). When the zone already
+  # has one, setup splices include:spf.migadu.com in after v=spf1 and keeps the
+  # existing senders and qualifier rather than replacing the record.
+  spf:
     hostname: "@"
+    value: "v=spf1 include:spf.migadu.com -all"
+
+  # DMARC policy records live at _dmarc.<domain>, never at the apex (RFC 7489
+  # §6.1) -- publishing at "@" yields no policy at all plus a stray apex TXT.
+  # An existing policy's rua/ruf/pct tags are preserved on merge.
+  dmarc:
+    hostname: _dmarc
     value: "v=DMARC1; p=quarantine;"
 
+  # Subdomain addressing (anything@user.example.com -> user@example.com).
+  # Opt-in via --with-wildcard-mx: it is non-standard behaviour, it is not
+  # portable between providers, and it changes delivery for every subdomain.
+  wildcard_mx:
+    - hostname: "*"
+      server: aspmx1.migadu.com
+      priority: 10
+    - hostname: "*"
+      server: aspmx2.migadu.com
+      priority: 20
+
+  # Thunderbird's autoconfig mechanism.
   autodiscover:
     type: CNAME
     hostname: autoconfig
     cname: autoconfig.migadu.com
 
+  # Generic service discovery. Port 465 (implicit TLS) is used for submission
+  # rather than 587/STARTTLS, per RFC 8314 and Migadu's own guidance.
+  srv:
+    - hostname: _autodiscover._tcp
+      target: autodiscover.migadu.com
+      port: 443
+      priority: 0
+      weight: 1
+    - hostname: _submissions._tcp
+      target: smtp.migadu.com
+      port: 465
+      priority: 0
+      weight: 1
+    - hostname: _imaps._tcp
+      target: imap.migadu.com
+      port: 993
+      priority: 0
+      weight: 1
+    - hostname: _pop3s._tcp
+      target: pop.migadu.com
+      port: 995
+      priority: 0
+      weight: 1
+
 verification:
   required_records:
+    - type: TXT
+      hostname: "@"
+      starts_with: "hosted-email-verify="
     - type: MX
       hostname: "@"
       contains: aspmx1.migadu.com
@@ -48,11 +108,23 @@ verification:
       hostname: "@"
       contains: include:spf.migadu.com
     - type: TXT
-      hostname: "@"
+      hostname: _dmarc
       starts_with: "v=DMARC1"
     - type: CNAME
       hostname: key1._domainkey
       contains: migadu.com
     - type: CNAME
+      hostname: key2._domainkey
+      contains: migadu.com
+    - type: CNAME
+      hostname: key3._domainkey
+      contains: migadu.com
+    - type: CNAME
       hostname: autoconfig
       contains: autoconfig.migadu.com
+    - type: SRV
+      hostname: _submissions._tcp
+      contains: smtp.migadu.com
+    - type: SRV
+      hostname: _imaps._tcp
+      contains: imap.migadu.com
