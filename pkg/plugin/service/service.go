@@ -77,6 +77,45 @@ Available services can be listed with: service list`,
 	}
 }
 
+// supersededBy reports whether an existing zone record is replaced by one of
+// the service's records. For most types that is a hostname+type match, but TXT
+// is deliberately narrower: TXT is multi-valued, and a zone apex routinely
+// carries an SPF policy alongside unrelated ownership proofs
+// (google-site-verification, yandex-verification, and so on). Matching TXT on
+// hostname+type alone would evict all of them the moment a service publishes
+// its SPF record, silently breaking Search Console and similar domain claims.
+// So a TXT only supersedes another TXT of the same kind.
+func supersededBy(existing dnsrecord.Record, records []dnsrecord.Record) bool {
+	for _, r := range records {
+		if existing.HostName != r.HostName || existing.RecordType != r.RecordType {
+			continue
+		}
+		if existing.RecordType == dnsrecord.RecordTypeTXT &&
+			txtKind(existing.Address) != txtKind(r.Address) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// txtKind classifies a TXT payload by its policy prefix. Unrecognized values
+// are keyed by their own content, so an unrelated verification token only ever
+// matches an identical one (a harmless de-duplication) and is otherwise kept.
+func txtKind(value string) string {
+	v := strings.ToLower(strings.TrimSpace(strings.Trim(value, `"`)))
+	switch {
+	case strings.HasPrefix(v, "v=spf1"):
+		return "spf"
+	case strings.HasPrefix(v, "v=dmarc1"):
+		return "dmarc"
+	case strings.HasPrefix(v, "v=dkim1"):
+		return "dkim"
+	default:
+		return "literal:" + v
+	}
+}
+
 // setup implements the setup command
 func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 	if len(ctx.Args) < 2 {
@@ -94,14 +133,15 @@ func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 	dryRun, _ := ctx.Flags["dry-run"].(bool)
 	replace, _ := ctx.Flags["replace"].(bool)
 
-	// Get current records if not replacing
-	var existingRecords []dnsrecord.Record
-	var err error
-	if !replace {
-		existingRecords, err = ctx.DNS.GetRecords(domain)
-		if err != nil {
-			return fmt.Errorf("failed to get existing records: %w", err)
-		}
+	// Always read the current zone, even with --replace. Providers apply this
+	// through a whole-zone write (Namecheap's setHosts replaces the entire
+	// record set), so anything missing from the slice we hand back is DELETED.
+	// Skipping this fetch under --replace meant publishing only the service's
+	// own records, wiping every unrelated A/CNAME/TXT in the zone: website and
+	// API hosts, ACME challenges, other services' verification tokens.
+	existingRecords, err := ctx.DNS.GetRecords(domain)
+	if err != nil {
+		return fmt.Errorf("failed to get existing records: %w", err)
 	}
 
 	// Generate DNS records from config
@@ -115,16 +155,23 @@ func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 		ctx.Output.Println()
 	}
 
+	// Split the existing zone into records this service supersedes and records
+	// that must survive untouched. Under --replace only the former are dropped.
+	var superseded []dnsrecord.Record
+	var preserved []dnsrecord.Record
+	for _, existing := range existingRecords {
+		if supersededBy(existing, records) {
+			superseded = append(superseded, existing)
+		} else {
+			preserved = append(preserved, existing)
+		}
+	}
+
 	// Check for conflicts if not replacing
 	var conflicts []string
-	if !replace && len(existingRecords) > 0 {
-		for _, newRecord := range records {
-			for _, existing := range existingRecords {
-				if existing.HostName == newRecord.HostName && existing.RecordType == newRecord.RecordType {
-					conflicts = append(conflicts, fmt.Sprintf("%s %s", existing.HostName, existing.RecordType))
-					break
-				}
-			}
+	if !replace {
+		for _, existing := range superseded {
+			conflicts = append(conflicts, fmt.Sprintf("%s %s", existing.HostName, existing.RecordType))
 		}
 	}
 
@@ -149,19 +196,32 @@ func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 	}
 	ctx.Output.Println()
 
+	if replace && len(superseded) > 0 {
+		ctx.Output.Println("Records to be replaced:")
+		for _, record := range superseded {
+			ctx.Output.Printf("  %s %s → %s\n", record.HostName, record.RecordType, record.Address)
+		}
+		ctx.Output.Println()
+	}
+
+	// The zone is rewritten wholesale, so state how much of it is carried
+	// through untouched. A silent count is the difference between noticing a
+	// wipe and publishing one.
+	ctx.Output.Printf("Preserving %d unrelated record(s) in the zone.\n", len(preserved))
+	ctx.Output.Println()
+
 	if dryRun {
 		ctx.Output.Println("Dry run completed. Use without --dry-run to apply changes.")
 		return nil
 	}
 
-	// Apply changes
-	var allRecords []dnsrecord.Record
-	if replace {
-		allRecords = records
-	} else {
-		allRecords = existingRecords
-		allRecords = append(allRecords, records...)
+	// Apply changes. Both paths keep every record the service does not own;
+	// --replace differs only in dropping the superseded same-kind ones.
+	allRecords := append([]dnsrecord.Record{}, preserved...)
+	if !replace {
+		allRecords = append(allRecords, superseded...)
 	}
+	allRecords = append(allRecords, records...)
 
 	err = ctx.DNS.SetRecords(domain, allRecords)
 	if err != nil {
@@ -321,8 +381,16 @@ func (p *ServicePlugin) remove(ctx *plugin.Context) error {
 		shouldRemove := false
 		for _, expected := range expectedRecords {
 			if record.HostName == expected.HostName && record.RecordType == expected.RecordType {
+				// An empty needle makes strings.Contains universally true, which
+				// would delete every record at this hostname+type. That happens
+				// whenever a template's value is exactly the domain (or the
+				// domain plus a trailing dot), so guard it explicitly.
+				needle := strings.TrimSuffix(strings.TrimSuffix(expected.Address, "."), domain)
+				if needle == "" {
+					continue
+				}
 				// Check if address matches pattern
-				if strings.Contains(record.Address, strings.TrimSuffix(strings.TrimSuffix(expected.Address, "."), domain)) {
+				if strings.Contains(record.Address, needle) {
 					shouldRemove = true
 					break
 				}
