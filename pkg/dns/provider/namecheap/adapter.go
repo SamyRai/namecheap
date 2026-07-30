@@ -3,6 +3,8 @@ package namecheap
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/namecheap/go-namecheap-sdk/v2/namecheap"
 	"zonekit/pkg/client"
@@ -35,7 +37,14 @@ func (p *NamecheapProvider) Capabilities() dnsprovider.ProviderCapabilities {
 		SupportsRecordID:      false,
 		SupportsBulkReplace:   true,
 		SupportsZoneDiscovery: true,
-		SupportedRecordTypes:  []string{"A", "AAAA", "CNAME", "MX", "TXT", "NS", "SRV", "URL", "URL301", "FRAME"},
+		// SRV is genuinely supported: its priority/weight/port are packed into
+		// the Address field (see encodeAddress), because Namecheap's API has no
+		// SRV sub-parameters. CAA likewise carries its full "flags tag value"
+		// payload in Address.
+		SupportedRecordTypes: []string{
+			"A", "AAAA", "ALIAS", "CAA", "CNAME", "MX", "MXE", "NS", "SRV", "TXT",
+			"URL", "URL301", "FRAME",
+		},
 	}
 }
 
@@ -174,7 +183,11 @@ func (p *NamecheapProvider) DeleteRecord(ctx context.Context, zoneID string, rec
 	return fmt.Errorf("DeleteRecord by ID is not supported by Namecheap (no persistent record IDs)")
 }
 
-// BulkReplaceRecords replaces all records in a zone
+// BulkReplaceRecords replaces all records in a zone.
+//
+// Namecheap's setHosts is a whole-zone write: the record set supplied here
+// becomes the zone, and anything omitted is deleted. Callers must pass the
+// complete desired state, not a delta.
 func (p *NamecheapProvider) BulkReplaceRecords(ctx context.Context, zoneID string, records []dnsrecord.Record) error {
 	hostRecords := make([]namecheap.DomainsDNSHostRecord, len(records))
 	hasMXRecords := false
@@ -182,18 +195,23 @@ func (p *NamecheapProvider) BulkReplaceRecords(ctx context.Context, zoneID strin
 		hostRecord := namecheap.DomainsDNSHostRecord{
 			HostName:   namecheap.String(record.HostName),
 			RecordType: namecheap.String(record.RecordType),
-			Address:    namecheap.String(record.Address),
+			Address:    namecheap.String(encodeAddress(record)),
 		}
 
 		if record.TTL > 0 {
 			hostRecord.TTL = namecheap.Int(record.TTL)
 		}
 
-		if record.MXPref > 0 {
-			hostRecord.MXPref = namecheap.UInt8(uint8(record.MXPref))
-		}
-
+		// MX priority rides in MXPref; SRV priority is encoded into the address
+		// (see encodeAddress), because the API exposes no SRV sub-parameters.
 		if record.RecordType == dnsrecord.RecordTypeMX {
+			pref := record.MXPref
+			if pref == 0 {
+				pref = record.Priority
+			}
+			if pref > 0 {
+				hostRecord.MXPref = namecheap.UInt8(uint8(pref))
+			}
 			hasMXRecords = true
 		}
 
@@ -205,8 +223,17 @@ func (p *NamecheapProvider) BulkReplaceRecords(ctx context.Context, zoneID strin
 		Records: &hostRecords,
 	}
 
-	if hasMXRecords {
-		args.EmailType = namecheap.String("MX")
+	// EmailType is zone-level state that setHosts overwrites. Introducing MX
+	// records means MX routing; otherwise keep whatever the zone already uses,
+	// so rewriting a zone for an unrelated reason cannot silently switch off
+	// Namecheap email forwarding (EmailTypeForward) or a hosted-mail setting.
+	switch {
+	case hasMXRecords:
+		args.EmailType = namecheap.String(namecheap.EmailTypeMX)
+	default:
+		if current := p.currentEmailType(zoneID); current != "" {
+			args.EmailType = namecheap.String(current)
+		}
 	}
 
 	_, err := p.client.DomainsDNSSetHosts(args)
@@ -215,6 +242,56 @@ func (p *NamecheapProvider) BulkReplaceRecords(ctx context.Context, zoneID strin
 	}
 
 	return nil
+}
+
+// currentEmailType reports the zone's existing EmailType, or "" when it cannot
+// be determined. Best-effort: a lookup failure must not block the write.
+func (p *NamecheapProvider) currentEmailType(zoneID string) string {
+	resp, err := p.client.DomainsDNSGetHosts(zoneID)
+	if err != nil || resp == nil || resp.DomainDNSGetHostsResult == nil {
+		return ""
+	}
+	return pointer.String(resp.DomainDNSGetHostsResult.EmailType)
+}
+
+// encodeAddress renders a record's value in the form Namecheap's Address field
+// expects. Namecheap models SRV entirely inside that field as
+// "priority weight port target" (with _service._proto as the hostname), since
+// its API exposes no dedicated SRV parameters -- MXPref is the only priority
+// field, and it applies to MX alone.
+func encodeAddress(record dnsrecord.Record) string {
+	if record.RecordType != dnsrecord.RecordTypeSRV {
+		return record.Address
+	}
+	target := record.Target
+	if target == "" {
+		// Tolerate callers that already packed everything into Address.
+		return record.Address
+	}
+	return fmt.Sprintf("%d %d %d %s", record.Priority, record.Weight, record.Port, target)
+}
+
+// decodeSRVAddress parses Namecheap's packed SRV address back into structured
+// fields. A value that does not match the four-field shape is left alone, so a
+// hand-entered record is never silently mangled.
+func decodeSRVAddress(record *dnsrecord.Record) {
+	if record.RecordType != dnsrecord.RecordTypeSRV {
+		return
+	}
+	fields := strings.Fields(record.Address)
+	if len(fields) != 4 {
+		return
+	}
+	priority, err1 := strconv.Atoi(fields[0])
+	weight, err2 := strconv.Atoi(fields[1])
+	port, err3 := strconv.Atoi(fields[2])
+	if err1 != nil || err2 != nil || err3 != nil {
+		return
+	}
+	record.Priority = priority
+	record.Weight = weight
+	record.Port = port
+	record.Target = fields[3]
 }
 
 // Validate checks if the provider is properly configured
@@ -233,7 +310,7 @@ func Register(client *client.Client) error {
 
 // Helper to convert Namecheap host to our Record
 func convertToRecord(host namecheap.DomainsDNSHostRecordDetailed) dnsrecord.Record {
-	return dnsrecord.Record{
+	record := dnsrecord.Record{
 		HostName:   pointer.String(host.Name),
 		RecordType: pointer.String(host.Type),
 		Address:    pointer.String(host.Address),
@@ -245,6 +322,10 @@ func convertToRecord(host namecheap.DomainsDNSHostRecordDetailed) dnsrecord.Reco
 			"host_id":   pointer.Int(host.HostId),
 		},
 	}
+	// SRV parameters arrive packed into Address; unpack so callers see the
+	// same structured fields they wrote.
+	decodeSRVAddress(&record)
+	return record
 }
 
 func safeDateString(dt *namecheap.DateTime) string {
