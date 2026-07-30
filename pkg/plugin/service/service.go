@@ -77,6 +77,18 @@ Available services can be listed with: service list`,
 	}
 }
 
+// displayValue renders a record's value for human review. SRV keeps its
+// parameters in structured fields rather than Address, so printing Address
+// alone showed a blank value -- and this output is the only thing a caller
+// reviews before authorizing a whole-zone write.
+func displayValue(record dnsrecord.Record) string {
+	if record.RecordType == dnsrecord.RecordTypeSRV && record.Target != "" {
+		return fmt.Sprintf("%s (priority: %d, weight: %d, port: %d)",
+			record.Target, record.Priority, record.Weight, record.Port)
+	}
+	return record.Address
+}
+
 // supersededBy reports whether an existing zone record is replaced by one of
 // the service's records. For most types that is a hostname+type match, but TXT
 // is deliberately narrower: TXT is multi-valued, and a zone apex routinely
@@ -337,17 +349,17 @@ func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 	ctx.Output.Println("Records to be added:")
 	for _, record := range records {
 		mxPref := ""
-		if record.MXPref > 0 {
+		if record.RecordType == dnsrecord.RecordTypeMX && record.MXPref > 0 {
 			mxPref = fmt.Sprintf(" (priority: %d)", record.MXPref)
 		}
-		ctx.Output.Printf("  %s %s → %s%s\n", record.HostName, record.RecordType, record.Address, mxPref)
+		ctx.Output.Printf("  %s %s → %s%s\n", record.HostName, record.RecordType, displayValue(record), mxPref)
 	}
 	ctx.Output.Println()
 
 	if replace && len(superseded) > 0 {
 		ctx.Output.Println("Records to be replaced:")
 		for _, record := range superseded {
-			ctx.Output.Printf("  %s %s → %s\n", record.HostName, record.RecordType, record.Address)
+			ctx.Output.Printf("  %s %s → %s\n", record.HostName, record.RecordType, displayValue(record))
 		}
 		ctx.Output.Println()
 	}

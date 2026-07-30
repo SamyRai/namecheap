@@ -206,3 +206,24 @@ func TestForcePolicyOverwrites(t *testing.T) {
 		t.Errorf("without --force-policy the existing sender must survive, got %q", merged[0].Address)
 	}
 }
+
+// Dry-run output is the only review surface before a whole-zone write, so an
+// SRV record must not render as a blank value.
+func TestDisplayValueRendersSRVParameters(t *testing.T) {
+	got := displayValue(dnsrecord.Record{
+		HostName:   "_submissions._tcp",
+		RecordType: dnsrecord.RecordTypeSRV,
+		Target:     "smtp.migadu.com.",
+		Port:       465,
+		Priority:   0,
+		Weight:     1,
+	})
+	for _, want := range []string{"smtp.migadu.com.", "465", "weight: 1"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("displayValue = %q, missing %q", got, want)
+		}
+	}
+	if strings.TrimSpace(got) == "" {
+		t.Error("SRV rendered as an empty value")
+	}
+}
