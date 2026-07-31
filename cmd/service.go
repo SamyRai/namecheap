@@ -128,6 +128,10 @@ var serviceSetupCmd = &cobra.Command{
 			val, _ := cmd.Flags().GetBool("with-wildcard-mx")
 			flags["with-wildcard-mx"] = val
 		}
+		if cmd.Flags().Changed("with-srv") {
+			val, _ := cmd.Flags().GetBool("with-srv")
+			flags["with-srv"] = val
+		}
 		if cmd.Flags().Changed("var") {
 			pairs, _ := cmd.Flags().GetStringArray("var")
 			vars := make(map[string]string, len(pairs))
@@ -295,5 +299,7 @@ func init() {
 		"Overwrite existing SPF/DMARC policies instead of extending them")
 	serviceSetupCmd.Flags().Bool("with-wildcard-mx", false,
 		"Also publish wildcard MX records (subdomain addressing), when the service defines them")
+	serviceSetupCmd.Flags().Bool("with-srv", false,
+		"Also publish SRV service-discovery records (not supported by the Namecheap API)")
 	serviceRemoveCmd.Flags().BoolP("confirm", "y", false, "Confirm the operation")
 }

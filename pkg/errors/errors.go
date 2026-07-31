@@ -68,10 +68,19 @@ type ErrAPI struct {
 }
 
 func (e *ErrAPI) Error() string {
+	// The provider's own message is the only actionable part of an API failure
+	// -- Namecheap, for instance, names the offending record and why it was
+	// rejected. Dropping e.Err made every failure read as an opaque
+	// "API error in SetHosts", which is useless when a destructive whole-zone
+	// write has just been refused.
+	base := "API error"
 	if e.Operation != "" {
-		return fmt.Sprintf("API error in %s: %s", e.Operation, e.Message)
+		base = fmt.Sprintf("API error in %s", e.Operation)
 	}
-	return fmt.Sprintf("API error: %s", e.Message)
+	if e.Err != nil {
+		return fmt.Sprintf("%s: %s: %v", base, e.Message, e.Err)
+	}
+	return fmt.Sprintf("%s: %s", base, e.Message)
 }
 
 func (e *ErrAPI) Unwrap() error {

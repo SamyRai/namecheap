@@ -22,6 +22,7 @@ func TestMigaduTemplateMatchesProviderDocs(t *testing.T) {
 	records := p.generateRecordsWithOpts(cfg, "example.com", generateOpts{
 		Vars:         map[string]string{"token": "jyersruu"},
 		WithWildcard: true,
+		WithSRV:      true,
 	})
 
 	if missing := unresolvedPlaceholders(records); len(missing) > 0 {

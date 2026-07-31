@@ -276,6 +276,7 @@ func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 	replace, _ := ctx.Flags["replace"].(bool)
 	forcePolicy, _ := ctx.Flags["force-policy"].(bool)
 	withWildcard, _ := ctx.Flags["with-wildcard-mx"].(bool)
+	withSRV, _ := ctx.Flags["with-srv"].(bool)
 	vars, _ := ctx.Flags["vars"].(map[string]string)
 
 	// Always read the current zone, even with --replace. Providers apply this
@@ -293,6 +294,7 @@ func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 	records := p.generateRecordsWithOpts(config, domain, generateOpts{
 		Vars:         vars,
 		WithWildcard: withWildcard,
+		WithSRV:      withSRV,
 	})
 
 	// Fail closed on unresolved placeholders. Publishing a literal "{token}"
@@ -655,6 +657,7 @@ func (p *ServicePlugin) generateRecords(config *Config, domainName string) []dns
 type generateOpts struct {
 	Vars         map[string]string
 	WithWildcard bool
+	WithSRV      bool
 }
 
 // expandPlaceholders substitutes {domain} plus any caller-supplied variables.
@@ -713,21 +716,26 @@ func (p *ServicePlugin) generateRecordsWithOpts(config *Config, domainName strin
 		})
 	}
 
-	// SRV service-discovery records.
-	for _, srv := range config.Records.SRV {
-		ttl := srv.TTL
-		if ttl == 0 {
-			ttl = dns.DefaultTTL
+	// SRV service-discovery records -- opt-in via --with-srv. Providers differ
+	// on whether they can write SRV at all (Namecheap's API cannot, though its
+	// control panel can), and the providers themselves label these optional, so
+	// requiring them by default would block the records that actually matter.
+	if opts.WithSRV {
+		for _, srv := range config.Records.SRV {
+			ttl := srv.TTL
+			if ttl == 0 {
+				ttl = dns.DefaultTTL
+			}
+			records = append(records, dnsrecord.Record{
+				HostName:   srv.Hostname,
+				RecordType: dnsrecord.RecordTypeSRV,
+				Target:     ensureTrailingDot(srv.Target),
+				Port:       srv.Port,
+				Priority:   srv.Priority,
+				Weight:     srv.Weight,
+				TTL:        ttl,
+			})
 		}
-		records = append(records, dnsrecord.Record{
-			HostName:   srv.Hostname,
-			RecordType: dnsrecord.RecordTypeSRV,
-			Target:     ensureTrailingDot(srv.Target),
-			Port:       srv.Port,
-			Priority:   srv.Priority,
-			Weight:     srv.Weight,
-			TTL:        ttl,
-		})
 	}
 
 	// Wildcard MX for subdomain addressing -- opt-in, since it changes

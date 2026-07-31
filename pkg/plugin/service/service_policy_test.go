@@ -98,8 +98,9 @@ func TestWildcardMXIsOptIn(t *testing.T) {
 func TestSRVRecordCarriesPriorityWeightPort(t *testing.T) {
 	f := &fakeDNS{}
 	ctx := setupCtx(f, map[string]interface{}{
-		"replace": true,
-		"vars":    map[string]string{"token": "abc"},
+		"replace":  true,
+		"with-srv": true,
+		"vars":     map[string]string{"token": "abc"},
 	})
 	if err := ownershipPlugin().setup(ctx); err != nil {
 		t.Fatalf("setup: %v", err)

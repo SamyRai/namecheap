@@ -22,41 +22,20 @@ func hostsResponse(emailType string, hosts ...namecheap.DomainsDNSHostRecordDeta
 	}
 }
 
-// Namecheap exposes no SRV sub-parameters, so priority/weight/port must be
-// packed into the Address field. This asserts the write side produces the
-// documented "priority weight port target" shape.
+// encodeAddress still renders the canonical SRV wire form. Namecheap cannot
+// accept it today, but the helper is shared with the read path (decode) and is
+// what a provider capable of SRV would emit.
 func TestSRVEncodedIntoAddress(t *testing.T) {
-	mockClient := new(MockNamecheapClient)
-	p := &NamecheapProvider{client: mockClient}
-
-	var captured *namecheap.DomainsDNSSetHostsArgs
-	mockClient.On("DomainsDNSSetHosts", mock.Anything).
-		Run(func(args mock.Arguments) {
-			captured = args.Get(0).(*namecheap.DomainsDNSSetHostsArgs)
-		}).
-		Return(&namecheap.DomainsDNSSetHostsCommandResponse{}, nil)
-	mockClient.On("DomainsDNSGetHosts", "example.com").Return(hostsResponse("FWD"), nil)
-
-	err := p.BulkReplaceRecords(context.Background(), "example.com", []dnsrecord.Record{
-		{
-			HostName:   "_submissions._tcp",
-			RecordType: dnsrecord.RecordTypeSRV,
-			Target:     "smtp.migadu.com.",
-			Port:       465,
-			Priority:   0,
-			Weight:     1,
-			TTL:        1800,
-		},
+	got := encodeAddress(dnsrecord.Record{
+		HostName:   "_submissions._tcp",
+		RecordType: dnsrecord.RecordTypeSRV,
+		Target:     "smtp.migadu.com.",
+		Port:       465,
+		Priority:   0,
+		Weight:     1,
 	})
-	require.NoError(t, err)
-	require.NotNil(t, captured)
-
-	records := *captured.Records
-	require.Len(t, records, 1)
-	assert.Equal(t, "_submissions._tcp", *records[0].HostName)
-	assert.Equal(t, "SRV", *records[0].RecordType)
-	assert.Equal(t, "0 1 465 smtp.migadu.com.", *records[0].Address,
-		"SRV must be encoded as 'priority weight port target'")
+	assert.Equal(t, "0 1 465 smtp.migadu.com.", got,
+		"SRV must render as 'priority weight port target'")
 }
 
 // Reading it back must reconstruct the structured fields, so a get/set cycle
@@ -206,13 +185,30 @@ func TestCAAPassesThroughVerbatim(t *testing.T) {
 	assert.Equal(t, caa, records[0].Address)
 }
 
-// The advertised capability set must match what the adapter can actually
-// write; claiming SRV while being unable to encode it produced malformed
-// records.
-func TestCapabilitiesIncludeSRVAndCAA(t *testing.T) {
+// Namecheap's API cannot create SRV records: its DNS platform supports them,
+// but setHosts rejects the type (AllowedRecordTypeValues omits SRV in every
+// SDK version, including v2.7.2). The adapter must say so up front instead of
+// letting the SDK fail a whole-zone write with an opaque message.
+func TestSRVRejectedWithActionableError(t *testing.T) {
+	mockClient := new(MockNamecheapClient)
+	p := &NamecheapProvider{client: mockClient}
+
+	err := p.BulkReplaceRecords(context.Background(), "example.com", []dnsrecord.Record{
+		{HostName: "@", RecordType: dnsrecord.RecordTypeA, Address: "203.0.113.1"},
+		{HostName: "_imaps._tcp", RecordType: dnsrecord.RecordTypeSRV, Target: "imap.migadu.com.", Port: 993},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "SRV")
+	assert.Contains(t, err.Error(), "control panel",
+		"the error should tell the operator where SRV records can actually be created")
+
+	// Nothing may be written when the record set cannot be represented.
+	mockClient.AssertNotCalled(t, "DomainsDNSSetHosts", mock.Anything)
+}
+
+// The advertised capability set must not claim SRV.
+func TestCapabilitiesDoNotClaimSRV(t *testing.T) {
 	p := &NamecheapProvider{}
-	types := p.Capabilities().SupportedRecordTypes
-	for _, want := range []string{"SRV", "CAA"} {
-		assert.Contains(t, types, want)
-	}
+	assert.NotContains(t, p.Capabilities().SupportedRecordTypes, "SRV")
+	assert.Contains(t, p.Capabilities().SupportedRecordTypes, "CAA")
 }

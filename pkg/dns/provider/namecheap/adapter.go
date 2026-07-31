@@ -37,12 +37,18 @@ func (p *NamecheapProvider) Capabilities() dnsprovider.ProviderCapabilities {
 		SupportsRecordID:      false,
 		SupportsBulkReplace:   true,
 		SupportsZoneDiscovery: true,
-		// SRV is genuinely supported: its priority/weight/port are packed into
-		// the Address field (see encodeAddress), because Namecheap's API has no
-		// SRV sub-parameters. CAA likewise carries its full "flags tag value"
-		// payload in Address.
+		// Mirrors namecheap.AllowedRecordTypeValues exactly. SRV is absent on
+		// purpose: Namecheap's DNS platform supports SRV records, but its API
+		// does not -- setHosts rejects the type outright, and they can only be
+		// created through the web control panel. Advertising SRV here produced
+		// a write that failed late with an opaque error.
+		//
+		// WARNING: because setHosts replaces the whole zone and getHosts cannot
+		// return SRV in a resubmittable form, SRV records added by hand in the
+		// control panel are not visible to this adapter and will be dropped by
+		// any API write to that zone.
 		SupportedRecordTypes: []string{
-			"A", "AAAA", "ALIAS", "CAA", "CNAME", "MX", "MXE", "NS", "SRV", "TXT",
+			"A", "AAAA", "ALIAS", "CAA", "CNAME", "MX", "MXE", "NS", "TXT",
 			"URL", "URL301", "FRAME",
 		},
 	}
@@ -192,6 +198,17 @@ func (p *NamecheapProvider) BulkReplaceRecords(ctx context.Context, zoneID strin
 	hostRecords := make([]namecheap.DomainsDNSHostRecord, len(records))
 	hasMXRecords := false
 	for i, record := range records {
+		// Fail with an actionable message rather than letting the SDK reject
+		// this as "invalid Records[N].RecordType value: SRV" from deep inside a
+		// whole-zone write.
+		if record.RecordType == dnsrecord.RecordTypeSRV {
+			return errors.NewInvalidInput("record_type", fmt.Sprintf(
+				"Namecheap's API cannot create SRV records (%s): its DNS supports them, "+
+					"but setHosts accepts only %v. Add SRV records in the Namecheap "+
+					"control panel under Advanced DNS -- note they are invisible to this "+
+					"API and will be lost on the next write to this zone",
+				record.HostName, namecheap.AllowedRecordTypeValues))
+		}
 		hostRecord := namecheap.DomainsDNSHostRecord{
 			HostName:   namecheap.String(record.HostName),
 			RecordType: namecheap.String(record.RecordType),

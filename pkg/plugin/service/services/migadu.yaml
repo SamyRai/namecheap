@@ -71,6 +71,12 @@ records:
 
   # Generic service discovery. Port 465 (implicit TLS) is used for submission
   # rather than 587/STARTTLS, per RFC 8314 and Migadu's own guidance.
+  #
+  # Opt-in via --with-srv. Migadu labels these optional, and provider support
+  # varies: Namecheap's DNS platform holds SRV records but its API cannot write
+  # them (setHosts rejects the type), so on Namecheap-hosted zones these must be
+  # added by hand under Advanced DNS -- and note that any API write to the zone
+  # will then drop them, since getHosts cannot return them for resubmission.
   srv:
     - hostname: _autodiscover._tcp
       target: autodiscover.migadu.com
