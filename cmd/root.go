@@ -9,6 +9,11 @@ import (
 	"github.com/spf13/viper"
 	"zonekit/pkg/config"
 	"zonekit/pkg/dns/provider/autodiscover"
+	// Linked for its init() side effects: domain-registrar providers register
+	// themselves, and nothing else imports them. Without this the `domain`,
+	// `nameservers` and `dnssec` trees fail at runtime with
+	// "provider 'namecheap' not found" and no build error to catch it.
+	_ "zonekit/pkg/domain/provider/all"
 	"zonekit/pkg/plugin"
 	"zonekit/pkg/plugin/service"
 	"zonekit/pkg/version"
