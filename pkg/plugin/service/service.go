@@ -306,8 +306,15 @@ func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 			strings.Join(missing, ", "), missing[0])
 	}
 
-	// Extend existing SPF/DMARC policies rather than clobbering them.
-	records = mergePolicyRecords(records, existingRecords, forcePolicy)
+	// Reconcile against the live zone. PlanZone owns the preserve/supersede
+	// rules and the SPF/DMARC policy merge, shared with the provider-specific
+	// onboarding flows so the destructive edge cases have one implementation.
+	plan := PlanZone(existingRecords, records, PlanOptions{
+		Replace:     replace,
+		ForcePolicy: forcePolicy,
+	})
+	records = plan.Desired
+	superseded, preserved := plan.Superseded, plan.Preserved
 
 	ctx.Output.Printf("Setting up %s DNS records for %s\n", config.DisplayName, domain)
 	ctx.Output.Println("=====================================")
@@ -317,24 +324,10 @@ func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 		ctx.Output.Println()
 	}
 
-	// Split the existing zone into records this service supersedes and records
-	// that must survive untouched. Under --replace only the former are dropped.
-	var superseded []dnsrecord.Record
-	var preserved []dnsrecord.Record
-	for _, existing := range existingRecords {
-		if supersededBy(existing, records) {
-			superseded = append(superseded, existing)
-		} else {
-			preserved = append(preserved, existing)
-		}
-	}
-
 	// Check for conflicts if not replacing
 	var conflicts []string
 	if !replace {
-		for _, existing := range superseded {
-			conflicts = append(conflicts, fmt.Sprintf("%s %s", existing.HostName, existing.RecordType))
-		}
+		conflicts = plan.Conflicts()
 	}
 
 	if len(conflicts) > 0 && !replace {
@@ -379,13 +372,7 @@ func (p *ServicePlugin) setup(ctx *plugin.Context) error {
 
 	// Apply changes. Both paths keep every record the service does not own;
 	// --replace differs only in dropping the superseded same-kind ones.
-	allRecords := append([]dnsrecord.Record{}, preserved...)
-	if !replace {
-		allRecords = append(allRecords, superseded...)
-	}
-	allRecords = append(allRecords, records...)
-
-	err = ctx.DNS.SetRecords(domain, allRecords)
+	err = ctx.DNS.SetRecords(domain, plan.Records(replace))
 	if err != nil {
 		return fmt.Errorf("failed to set DNS records: %w", err)
 	}
