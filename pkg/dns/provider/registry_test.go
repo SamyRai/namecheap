@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -27,19 +28,36 @@ func (m *mockProviderForRegistry) Name() string {
 	return m.name
 }
 
-func (m *mockProviderForRegistry) GetRecords(domainName string) ([]dnsrecord.Record, error) {
-	if m.getRecordsError != nil {
-		return nil, m.getRecordsError
-	}
-	return m.records[domainName], nil
+func (m *mockProviderForRegistry) ListZones(ctx context.Context) ([]Zone, error) {
+	return nil, nil
 }
 
-func (m *mockProviderForRegistry) SetRecords(domainName string, records []dnsrecord.Record) error {
-	if m.setRecordsError != nil {
-		return m.setRecordsError
-	}
-	m.records[domainName] = records
+func (m *mockProviderForRegistry) GetZone(ctx context.Context, zoneID string) (Zone, error) {
+	return Zone{}, nil
+}
+
+func (m *mockProviderForRegistry) ListRecords(ctx context.Context, zoneID string) ([]dnsrecord.Record, error) {
+	return nil, nil
+}
+
+func (m *mockProviderForRegistry) CreateRecord(ctx context.Context, zoneID string, record dnsrecord.Record) (dnsrecord.Record, error) {
+	return dnsrecord.Record{}, nil
+}
+
+func (m *mockProviderForRegistry) UpdateRecord(ctx context.Context, zoneID string, recordID string, record dnsrecord.Record) (dnsrecord.Record, error) {
+	return dnsrecord.Record{}, nil
+}
+
+func (m *mockProviderForRegistry) DeleteRecord(ctx context.Context, zoneID string, recordID string) error {
 	return nil
+}
+
+func (m *mockProviderForRegistry) BulkReplaceRecords(ctx context.Context, zoneID string, records []dnsrecord.Record) error {
+	return nil
+}
+
+func (m *mockProviderForRegistry) Capabilities() ProviderCapabilities {
+	return ProviderCapabilities{}
 }
 
 func (m *mockProviderForRegistry) Validate() error {

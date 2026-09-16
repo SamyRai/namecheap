@@ -43,44 +43,148 @@ func (p *RESTProvider) Name() string {
 	return p.name
 }
 
-// GetRecords retrieves all DNS records for a domain
-func (p *RESTProvider) GetRecords(domainName string) ([]dnsrecord.Record, error) {
-	endpoint, ok := p.endpoints["get_records"]
+// ListZones retrieves all zones managed by the provider
+func (p *RESTProvider) ListZones(ctx context.Context) ([]dnsprovider.Zone, error) {
+	// 1. Check if a static zone_id is configured in settings
+	if zoneID, ok := p.settings["zone_id"].(string); ok && zoneID != "" {
+		zoneName := zoneID // Default name to ID if not provided
+		if name, ok := p.settings["zone_name"].(string); ok && name != "" {
+			zoneName = name
+		}
+		return []dnsprovider.Zone{
+			{ID: zoneID, Name: zoneName},
+		}, nil
+	}
+
+	// 2. Use list_zones endpoint if available
+	endpoint, ok := p.endpoints["list_zones"]
 	if !ok {
-		return nil, fmt.Errorf("get_records endpoint not configured")
+		endpoint, ok = p.endpoints["zones"]
+	}
+	if !ok {
+		// If no endpoint, return empty list (stub behavior)
+		return []dnsprovider.Zone{}, nil
 	}
 
-	// Replace placeholders in endpoint (e.g., {zone_id}, {domain})
-	endpoint = p.replacePlaceholders(endpoint, domainName)
-
-	// Get zone ID if required
-	zoneID, err := p.getZoneID(domainName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get zone ID: %w", err)
-	}
-	if zoneID != "" {
-		endpoint = strings.ReplaceAll(endpoint, "{zone_id}", zoneID)
-	}
-
-	ctx := context.Background()
 	resp, err := p.client.Get(ctx, endpoint, nil)
 	if err != nil {
-		return nil, errors.NewAPI("GetRecords", fmt.Sprintf("failed to get DNS records for %s", domainName), err)
+		return nil, errors.NewAPI("ListZones", "failed to list zones", err)
 	}
 
-	// Parse response (this will close the body)
 	var responseData interface{}
 	if err := httpprovider.ParseJSONResponse(resp, &responseData); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	// Extract records using list path
+	zoneMaps, err := mapper.ExtractZones(responseData, p.mappings.ZoneListPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract zones: %w", err)
+	}
+
+	zones := make([]dnsprovider.Zone, 0, len(zoneMaps))
+	for _, zoneMap := range zoneMaps {
+		zone, err := mapper.FromProviderZoneFormat(zoneMap, p.mappings)
+		if err != nil {
+			// Log error but continue? Or fail? For now, fail.
+			return nil, fmt.Errorf("failed to convert zone: %w", err)
+		}
+		zones = append(zones, zone)
+	}
+
+	return zones, nil
+}
+
+// GetZone retrieves a specific zone by ID
+func (p *RESTProvider) GetZone(ctx context.Context, zoneID string) (dnsprovider.Zone, error) {
+	// 1. Check if a static zone_id matches
+	if configuredID, ok := p.settings["zone_id"].(string); ok && configuredID == zoneID {
+		zoneName := zoneID
+		if name, ok := p.settings["zone_name"].(string); ok && name != "" {
+			zoneName = name
+		}
+		return dnsprovider.Zone{ID: zoneID, Name: zoneName}, nil
+	}
+
+	// 2. Use get_zone endpoint if available
+	endpoint, ok := p.endpoints["get_zone"]
+	if ok {
+		endpoint = strings.ReplaceAll(endpoint, "{zone_id}", zoneID)
+		endpoint = strings.ReplaceAll(endpoint, "{id}", zoneID)
+
+		resp, err := p.client.Get(ctx, endpoint, nil)
+		if err != nil {
+			return dnsprovider.Zone{}, errors.NewAPI("GetZone", fmt.Sprintf("failed to get zone %s", zoneID), err)
+		}
+
+		var responseData interface{}
+		if err := httpprovider.ParseJSONResponse(resp, &responseData); err != nil {
+			return dnsprovider.Zone{}, fmt.Errorf("failed to parse response: %w", err)
+		}
+
+		// Assuming response is the zone object directly or wrapped in result
+		// We can try to reuse ExtractZones if it handles single object or wrap it?
+		// Or assume single object mapping.
+		// Usually REST APIs return { "result": { ... } } or just { ... }
+
+		// If responseData has the wrapper path (e.g. "result"), extract it
+		dataToMap := responseData
+		if p.mappings.ZoneListPath != "" && p.mappings.ZoneListPath != "zones" { // Heuristic: list path might also be response wrapper
+			// Simple check: is it a map with that key?
+			if m, ok := responseData.(map[string]interface{}); ok {
+				if val, ok := m[p.mappings.ZoneListPath]; ok {
+					// Check if val is map (single object) or array (list)
+					// For GetZone, expect map
+					if vMap, ok := val.(map[string]interface{}); ok {
+						dataToMap = vMap
+					}
+				}
+			}
+		} else if m, ok := responseData.(map[string]interface{}); ok {
+			// standard "result" wrapper check
+			if res, ok := m["result"]; ok {
+				dataToMap = res
+			}
+		}
+
+		if m, ok := dataToMap.(map[string]interface{}); ok {
+			return mapper.FromProviderZoneFormat(m, p.mappings)
+		}
+		return dnsprovider.Zone{}, fmt.Errorf("unexpected response format for GetZone")
+	}
+
+	// Fallback/Stub: return a zone with the ID and Name = ID
+	// This maintains compatibility for simple providers where ID=Name
+	return dnsprovider.Zone{ID: zoneID, Name: zoneID}, nil
+}
+
+// ListRecords retrieves all DNS records for a zone
+func (p *RESTProvider) ListRecords(ctx context.Context, zoneID string) ([]dnsrecord.Record, error) {
+	endpoint, ok := p.endpoints["get_records"]
+	if !ok {
+		endpoint, ok = p.endpoints["list_records"]
+	}
+	if !ok {
+		return nil, fmt.Errorf("get_records endpoint not configured")
+	}
+
+	endpoint = strings.ReplaceAll(endpoint, "{zone_id}", zoneID)
+	endpoint = strings.ReplaceAll(endpoint, "{domain}", zoneID)
+
+	resp, err := p.client.Get(ctx, endpoint, nil)
+	if err != nil {
+		return nil, errors.NewAPI("ListRecords", fmt.Sprintf("failed to get DNS records for zone %s", zoneID), err)
+	}
+
+	var responseData interface{}
+	if err := httpprovider.ParseJSONResponse(resp, &responseData); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
 	recordMaps, err := mapper.ExtractRecords(responseData, p.mappings.ListPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract records: %w", err)
 	}
 
-	// Convert to dnsrecord.Record
 	records := make([]dnsrecord.Record, 0, len(recordMaps))
 	for _, recordMap := range recordMaps {
 		record, err := mapper.FromProviderFormat(recordMap, p.mappings.Response)
@@ -93,88 +197,91 @@ func (p *RESTProvider) GetRecords(domainName string) ([]dnsrecord.Record, error)
 	return records, nil
 }
 
-// SetRecords sets DNS records for a domain (replaces all existing records)
-func (p *RESTProvider) SetRecords(domainName string, records []dnsrecord.Record) error {
-	// Most REST APIs don't support bulk replace, so we need to:
-	// 1. Get existing records
-	// 2. Delete all existing records
-	// 3. Create new records
-
-	existingRecords, err := p.GetRecords(domainName)
-	if err != nil {
-		return fmt.Errorf("failed to get existing records: %w", err)
-	}
-
-	ctx := context.Background()
-
-	// Delete existing records
-	for _, record := range existingRecords {
-		if err := p.deleteRecord(ctx, domainName, record); err != nil {
-			// Log but continue - some records might not exist
-			continue
-		}
-	}
-
-	// Create new records
-	for _, record := range records {
-		if err := p.createRecord(ctx, domainName, record); err != nil {
-			return fmt.Errorf("failed to create record: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// createRecord creates a single DNS record
-func (p *RESTProvider) createRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
+// CreateRecord creates a new DNS record
+func (p *RESTProvider) CreateRecord(ctx context.Context, zoneID string, record dnsrecord.Record) (dnsrecord.Record, error) {
 	endpoint, ok := p.endpoints["create_record"]
 	if !ok {
-		return fmt.Errorf("create_record endpoint not configured")
+		return dnsrecord.Record{}, fmt.Errorf("create_record endpoint not configured")
 	}
 
-	endpoint = p.replacePlaceholders(endpoint, domainName)
-	zoneID, _ := p.getZoneID(domainName)
-	if zoneID != "" {
-		endpoint = strings.ReplaceAll(endpoint, "{zone_id}", zoneID)
-	}
+	endpoint = strings.ReplaceAll(endpoint, "{zone_id}", zoneID)
+	endpoint = strings.ReplaceAll(endpoint, "{domain}", zoneID)
 
-	// Convert record to provider format
 	body := mapper.ToProviderFormat(record, p.mappings.Request)
 
 	resp, err := p.client.Post(ctx, endpoint, body)
 	if err != nil {
-		return errors.NewAPI("CreateRecord", "failed to create DNS record", err)
+		return dnsrecord.Record{}, errors.NewAPI("CreateRecord", "failed to create DNS record", err)
 	}
-	defer resp.Body.Close()
 
-	return nil
+	// Parse response to get ID and other server-assigned fields
+	var responseData interface{}
+	if err := httpprovider.ParseJSONResponse(resp, &responseData); err != nil {
+		return dnsrecord.Record{}, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	recordMap, err := mapper.ExtractRecord(responseData, p.mappings.ResponsePath)
+	if err != nil {
+		return dnsrecord.Record{}, fmt.Errorf("failed to extract record from response: %w", err)
+	}
+
+	createdRecord, err := mapper.FromProviderFormat(recordMap, p.mappings.Response)
+	if err != nil {
+		return dnsrecord.Record{}, fmt.Errorf("failed to convert record from response: %w", err)
+	}
+
+	return createdRecord, nil
 }
 
-// deleteRecord deletes a single DNS record
-func (p *RESTProvider) deleteRecord(ctx context.Context, domainName string, record dnsrecord.Record) error {
+// UpdateRecord updates an existing DNS record
+func (p *RESTProvider) UpdateRecord(ctx context.Context, zoneID string, recordID string, record dnsrecord.Record) (dnsrecord.Record, error) {
+	endpoint, ok := p.endpoints["update_record"]
+	if !ok {
+		return dnsrecord.Record{}, fmt.Errorf("update_record endpoint not configured")
+	}
+
+	endpoint = strings.ReplaceAll(endpoint, "{zone_id}", zoneID)
+	endpoint = strings.ReplaceAll(endpoint, "{domain}", zoneID)
+	endpoint = strings.ReplaceAll(endpoint, "{record_id}", recordID)
+	endpoint = strings.ReplaceAll(endpoint, "{id}", recordID)
+
+	body := mapper.ToProviderFormat(record, p.mappings.Request)
+
+	resp, err := p.client.Put(ctx, endpoint, body)
+	if err != nil {
+		return dnsrecord.Record{}, errors.NewAPI("UpdateRecord", "failed to update DNS record", err)
+	}
+
+	// Parse response to get updated fields
+	var responseData interface{}
+	if err := httpprovider.ParseJSONResponse(resp, &responseData); err != nil {
+		return dnsrecord.Record{}, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	recordMap, err := mapper.ExtractRecord(responseData, p.mappings.ResponsePath)
+	if err != nil {
+		return dnsrecord.Record{}, fmt.Errorf("failed to extract record from response: %w", err)
+	}
+
+	updatedRecord, err := mapper.FromProviderFormat(recordMap, p.mappings.Response)
+	if err != nil {
+		return dnsrecord.Record{}, fmt.Errorf("failed to convert record from response: %w", err)
+	}
+
+	return updatedRecord, nil
+}
+
+// DeleteRecord deletes a DNS record
+func (p *RESTProvider) DeleteRecord(ctx context.Context, zoneID string, recordID string) error {
 	endpoint, ok := p.endpoints["delete_record"]
 	if !ok {
-		// If delete endpoint not configured, try to use record ID
-		// For now, skip if not configured
-		return nil
+		return fmt.Errorf("delete_record endpoint not configured")
 	}
 
-	endpoint = p.replacePlaceholders(endpoint, domainName)
-	zoneID, _ := p.getZoneID(domainName)
-	if zoneID != "" {
-		endpoint = strings.ReplaceAll(endpoint, "{zone_id}", zoneID)
-	}
-
-	// Replace {record_id} or {id} placeholders with the record's ID if provided
-	if strings.Contains(endpoint, "{record_id}") || strings.Contains(endpoint, "{id}") || strings.Contains(endpoint, "{recordId}") {
-		// Prefer record.ID
-		if record.ID == "" {
-			return fmt.Errorf("delete_record requires record_id - record is missing ID")
-		}
-		endpoint = strings.ReplaceAll(endpoint, "{record_id}", record.ID)
-		endpoint = strings.ReplaceAll(endpoint, "{id}", record.ID)
-		endpoint = strings.ReplaceAll(endpoint, "{recordId}", record.ID)
-	}
+	endpoint = strings.ReplaceAll(endpoint, "{zone_id}", zoneID)
+	endpoint = strings.ReplaceAll(endpoint, "{domain}", zoneID)
+	endpoint = strings.ReplaceAll(endpoint, "{record_id}", recordID)
+	endpoint = strings.ReplaceAll(endpoint, "{id}", recordID)
 
 	resp, err := p.client.Delete(ctx, endpoint)
 	if err != nil {
@@ -183,6 +290,61 @@ func (p *RESTProvider) deleteRecord(ctx context.Context, domainName string, reco
 	defer resp.Body.Close()
 
 	return nil
+}
+
+// BulkReplaceRecords replaces all records in a zone with the provided set
+func (p *RESTProvider) BulkReplaceRecords(ctx context.Context, zoneID string, records []dnsrecord.Record) error {
+	// Naive implementation
+	if !p.Capabilities().CanDeleteRecord || !p.Capabilities().CanCreateRecord {
+		return fmt.Errorf("provider does not support bulk replace (missing delete_record or create_record capability)")
+	}
+
+	existing, err := p.ListRecords(ctx, zoneID)
+	if err != nil {
+		return err
+	}
+
+	for _, r := range existing {
+		if r.ID != "" {
+			if err := p.DeleteRecord(ctx, zoneID, r.ID); err != nil {
+				return fmt.Errorf("failed to delete record %s during bulk replace: %w", r.ID, err)
+			}
+		}
+	}
+
+	for _, r := range records {
+		_, err := p.CreateRecord(ctx, zoneID, r)
+		if err != nil {
+			return fmt.Errorf("failed to create record %s during bulk replace: %w", r.HostName, err)
+		}
+	}
+	return nil
+}
+
+// Capabilities returns the provider's capabilities
+func (p *RESTProvider) Capabilities() dnsprovider.ProviderCapabilities {
+	canDelete := p.hasEndpoint("delete_record")
+	canCreate := p.hasEndpoint("create_record")
+
+	return dnsprovider.ProviderCapabilities{
+		CanListZones:    p.hasEndpoint("list_zones") || p.hasEndpoint("zones") || p.hasSetting("zone_id"),
+		CanGetZone:      true,
+		CanCreateRecord: canCreate,
+		CanUpdateRecord: p.hasEndpoint("update_record"),
+		CanDeleteRecord: canDelete,
+		// Naive bulk replace requires delete and create
+		CanBulkReplace:  canDelete && canCreate,
+	}
+}
+
+func (p *RESTProvider) hasEndpoint(name string) bool {
+	_, ok := p.endpoints[name]
+	return ok
+}
+
+func (p *RESTProvider) hasSetting(name string) bool {
+	_, ok := p.settings[name]
+	return ok
 }
 
 // Validate checks if the provider is properly configured
@@ -199,103 +361,4 @@ func (p *RESTProvider) Validate() error {
 	return nil
 }
 
-// Helper methods
-
-func (p *RESTProvider) replacePlaceholders(endpoint, domainName string) string {
-	endpoint = strings.ReplaceAll(endpoint, "{domain}", domainName)
-	return endpoint
-}
-
-func (p *RESTProvider) getZoneID(domainName string) (string, error) {
-	// 1. Check if zone_id is in settings
-	if zoneID, ok := p.settings["zone_id"].(string); ok && zoneID != "" {
-		return zoneID, nil
-	}
-
-	// 2. Try configured endpoints that may list or get zones
-	candidates := []string{"get_zone", "get_zone_by_name", "list_zones", "zones", "search_zones"}
-	for _, key := range candidates {
-		if path, ok := p.endpoints[key]; ok && path != "" {
-			// Replace placeholders
-			endpoint := p.replacePlaceholders(path, domainName)
-
-			ctx := context.Background()
-			// If endpoint does not include domain placeholder, try passing domain as query param 'name'
-			query := map[string]string{}
-			if !strings.Contains(endpoint, "{domain}") {
-				query["name"] = domainName
-			}
-
-			resp, err := p.client.Get(ctx, endpoint, query)
-			if err != nil {
-				// Try next candidate
-				continue
-			}
-
-			var data interface{}
-			if err := httpprovider.ParseJSONResponse(resp, &data); err != nil {
-				continue
-			}
-
-			// Search for matching zone object
-			// Check for object with 'result' array (Cloudflare style)
-			if m, ok := data.(map[string]interface{}); ok {
-				// Search arrays at top level
-				for _, v := range m {
-					switch arr := v.(type) {
-					case []interface{}:
-						for _, item := range arr {
-							if id := extractIDForDomain(item, domainName); id != "" {
-								return id, nil
-							}
-						}
-					case map[string]interface{}:
-						if id := extractIDForDomain(arr, domainName); id != "" {
-							return id, nil
-						}
-					}
-				}
-			}
-			// As fallback, try top-level array
-			if arr, ok := data.([]interface{}); ok {
-				for _, item := range arr {
-					if id := extractIDForDomain(item, domainName); id != "" {
-						return id, nil
-					}
-				}
-			}
-		}
-	}
-
-	// 3. Not found
-	return "", nil
-}
-
-// extractIDForDomain tries to extract an 'id' field from an object if it matches the provided domain name
-func extractIDForDomain(item interface{}, domainName string) string {
-	obj, ok := item.(map[string]interface{})
-	if !ok {
-		return ""
-	}
-
-	// Check common name fields
-	nameCandidates := []string{"name", "zone", "domain", "zone_name"}
-	for _, nc := range nameCandidates {
-		if v, ok := obj[nc]; ok {
-			if vs, ok := v.(string); ok && strings.EqualFold(strings.TrimSuffix(vs, "."), domainName) {
-				// Found matching name; extract id
-				for _, idc := range []string{"id", "zone_id", "dns_record_id"} {
-					if idv, ok := obj[idc]; ok {
-						return fmt.Sprintf("%v", idv)
-					}
-				}
-			}
-		}
-	}
-
-	// Only return an ID if it was found alongside a matching name; otherwise, no match
-	return ""
-}
-
-// Ensure RESTProvider implements Provider interface
 var _ dnsprovider.Provider = (*RESTProvider)(nil)

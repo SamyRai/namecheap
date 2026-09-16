@@ -87,7 +87,22 @@ func buildMappings(configMappings *dnsprovider.FieldMappings) mapper.Mappings {
 	}
 
 	m := mapper.Mappings{
-		ListPath: configMappings.ListPath,
+		ListPath:     configMappings.ListPath,
+		ResponsePath: configMappings.ResponsePath,
+		ZoneListPath: configMappings.ZoneListPath,
+		ZoneID:       configMappings.ZoneID,
+		ZoneName:     configMappings.ZoneName,
+	}
+
+	// Set defaults for zone mappings if empty
+	if m.ZoneListPath == "" {
+		m.ZoneListPath = "zones"
+	}
+	if m.ZoneID == "" {
+		m.ZoneID = "id"
+	}
+	if m.ZoneName == "" {
+		m.ZoneName = "name"
 	}
 
 	// Request mappings

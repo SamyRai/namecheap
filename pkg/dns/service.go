@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -48,14 +49,53 @@ func NewServiceWithProviderName(providerName string) (*Service, error) {
 	}, nil
 }
 
+// resolveZoneID resolves a domain name to a zone ID
+func (s *Service) resolveZoneID(ctx context.Context, domainName string) (string, error) {
+	// 1. Try GetZone assuming ID == domainName
+	if s.provider.Capabilities().CanGetZone {
+		z, err := s.provider.GetZone(ctx, domainName)
+		if err == nil {
+			return z.ID, nil
+		}
+	}
+
+	// 2. ListZones
+	if s.provider.Capabilities().CanListZones {
+		zones, err := s.provider.ListZones(ctx)
+		if err != nil {
+			// Don't fail here, try fallback
+		} else {
+			for _, z := range zones {
+				// Basic matching
+				if strings.EqualFold(z.Name, domainName) || strings.EqualFold(z.Name, domainName+".") {
+					return z.ID, nil
+				}
+			}
+		}
+	}
+
+	// Fallback: use domainName as ID
+	return domainName, nil
+}
+
 // GetRecords retrieves all DNS records for a domain
 func (s *Service) GetRecords(domainName string) ([]dnsrecord.Record, error) {
-	return s.provider.GetRecords(domainName)
+	ctx := context.Background()
+	zoneID, err := s.resolveZoneID(ctx, domainName)
+	if err != nil {
+		return nil, err
+	}
+	return s.provider.ListRecords(ctx, zoneID)
 }
 
 // SetRecords sets DNS records for a domain (replaces all existing records)
 func (s *Service) SetRecords(domainName string, records []dnsrecord.Record) error {
-	return s.provider.SetRecords(domainName, records)
+	ctx := context.Background()
+	zoneID, err := s.resolveZoneID(ctx, domainName)
+	if err != nil {
+		return err
+	}
+	return s.provider.BulkReplaceRecords(ctx, zoneID, records)
 }
 
 // AddRecord adds a single DNS record to a domain
@@ -65,8 +105,19 @@ func (s *Service) AddRecord(domainName string, record dnsrecord.Record) error {
 		return fmt.Errorf("invalid record: %w", err)
 	}
 
-	// Get existing records
-	existingRecords, err := s.GetRecords(domainName)
+	ctx := context.Background()
+	zoneID, err := s.resolveZoneID(ctx, domainName)
+	if err != nil {
+		return err
+	}
+
+	if s.provider.Capabilities().CanCreateRecord {
+		_, err := s.provider.CreateRecord(ctx, zoneID, record)
+		return err
+	}
+
+	// Fallback: Get existing records
+	existingRecords, err := s.provider.ListRecords(ctx, zoneID)
 	if err != nil {
 		return fmt.Errorf("failed to get existing records: %w", err)
 	}
@@ -75,22 +126,30 @@ func (s *Service) AddRecord(domainName string, record dnsrecord.Record) error {
 	allRecords := append(existingRecords, record)
 
 	// Set all records
-	return s.SetRecords(domainName, allRecords)
+	return s.provider.BulkReplaceRecords(ctx, zoneID, allRecords)
 }
 
 // UpdateRecord updates a DNS record by hostname and type
 func (s *Service) UpdateRecord(domainName string, hostname, recordType string, newRecord dnsrecord.Record) error {
-	// Get existing records
-	existingRecords, err := s.GetRecords(domainName)
+	ctx := context.Background()
+	zoneID, err := s.resolveZoneID(ctx, domainName)
+	if err != nil {
+		return err
+	}
+
+	// Find the record to get ID
+	existingRecords, err := s.provider.ListRecords(ctx, zoneID)
 	if err != nil {
 		return fmt.Errorf("failed to get existing records: %w", err)
 	}
 
-	// Find and update the record
+	var recordID string
+	var foundIndex int
 	found := false
 	for i, record := range existingRecords {
 		if record.HostName == hostname && record.RecordType == recordType {
-			existingRecords[i] = newRecord
+			recordID = record.ID
+			foundIndex = i
 			found = true
 			break
 		}
@@ -100,23 +159,36 @@ func (s *Service) UpdateRecord(domainName string, hostname, recordType string, n
 		return errors.NewNotFound("DNS record", fmt.Sprintf("%s %s", hostname, recordType))
 	}
 
-	// Set all records
-	return s.SetRecords(domainName, existingRecords)
+	if s.provider.Capabilities().CanUpdateRecord && recordID != "" {
+		_, err := s.provider.UpdateRecord(ctx, zoneID, recordID, newRecord)
+		return err
+	}
+
+	// Fallback to bulk replace
+	existingRecords[foundIndex] = newRecord
+	return s.provider.BulkReplaceRecords(ctx, zoneID, existingRecords)
 }
 
 // DeleteRecord removes a DNS record by hostname and type
 func (s *Service) DeleteRecord(domainName string, hostname, recordType string) error {
-	// Get existing records
-	existingRecords, err := s.GetRecords(domainName)
+	ctx := context.Background()
+	zoneID, err := s.resolveZoneID(ctx, domainName)
+	if err != nil {
+		return err
+	}
+
+	existingRecords, err := s.provider.ListRecords(ctx, zoneID)
 	if err != nil {
 		return fmt.Errorf("failed to get existing records: %w", err)
 	}
 
-	// Filter out the record to delete
-	var filteredRecords []dnsrecord.Record
+	var recordID string
 	found := false
+	var filteredRecords []dnsrecord.Record
+
 	for _, record := range existingRecords {
 		if record.HostName == hostname && record.RecordType == recordType {
+			recordID = record.ID
 			found = true
 			continue
 		}
@@ -127,8 +199,11 @@ func (s *Service) DeleteRecord(domainName string, hostname, recordType string) e
 		return errors.NewNotFound("DNS record", fmt.Sprintf("%s %s", hostname, recordType))
 	}
 
-	// Set remaining records
-	return s.SetRecords(domainName, filteredRecords)
+	if s.provider.Capabilities().CanDeleteRecord && recordID != "" {
+		return s.provider.DeleteRecord(ctx, zoneID, recordID)
+	}
+
+	return s.provider.BulkReplaceRecords(ctx, zoneID, filteredRecords)
 }
 
 // DeleteAllRecords removes all DNS records for a domain
