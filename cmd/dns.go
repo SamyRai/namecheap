@@ -180,6 +180,7 @@ var dnsUpdateCmd = &cobra.Command{
 
 		ttl, _ := cmd.Flags().GetInt("ttl")
 		mxPref, _ := cmd.Flags().GetInt("mx-pref")
+		matchValue, _ := cmd.Flags().GetString("match-value")
 
 		// Get current account configuration
 		accountConfig, err := GetCurrentAccount()
@@ -209,7 +210,7 @@ var dnsUpdateCmd = &cobra.Command{
 			return fmt.Errorf("invalid record: %w", err)
 		}
 
-		err = dnsService.UpdateRecord(domainName, hostname, recordType, newRecord)
+		err = dnsService.UpdateRecordMatching(domainName, hostname, recordType, matchValue, newRecord)
 		if err != nil {
 			return fmt.Errorf("failed to update DNS record: %w", err)
 		}
@@ -487,6 +488,8 @@ func init() {
 	// Flags for dns update
 	dnsUpdateCmd.Flags().IntP("ttl", "", 0, "TTL value (Time To Live)")
 	dnsUpdateCmd.Flags().IntP("mx-pref", "", 0, "MX preference value (for MX records)")
+	dnsUpdateCmd.Flags().StringP("match-value", "", "",
+		"Current value of the record to replace. Required when several records share the hostname and type (e.g. multiple TXT at the apex)")
 
 	// Flags for dns clear
 	dnsClearCmd.Flags().BoolP("confirm", "y", false, "Confirm deletion of all records")
