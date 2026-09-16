@@ -138,8 +138,7 @@ func (s *Spec) extractEndpoints() map[string]string {
 			if endpointKey != "" {
 				// Avoid overwriting existing endpoints with single-item paths (prefer list endpoints)
 				if existing, ok := endpoints[endpointKey]; ok && existing != "" {
-					// Prefer the endpoint without path parameters
-					if strings.Contains(existing, "{") && !strings.Contains(path, "{") {
+					if preferEndpointPath(path, existing) {
 						endpoints[endpointKey] = path
 					}
 					// otherwise keep existing
@@ -151,6 +150,29 @@ func (s *Spec) extractEndpoints() map[string]string {
 	}
 
 	return endpoints
+}
+
+// preferEndpointPath reports whether candidate is a better endpoint than
+// current for the same operation.
+//
+// A spec commonly exposes both a collection and a single-item path for one
+// operation — `/zones/{zone_id}/dns_records` alongside
+// `/zones/{zone_id}/dns_records/{dns_record_id}`. The collection is the one we
+// want. Testing merely for the ABSENCE of parameters cannot separate them,
+// since both are parameterised; the winner then came down to Go's randomized
+// map iteration order, making endpoint selection non-deterministic between
+// runs of the same binary.
+//
+// Fewest path parameters wins, then the shorter path, then lexicographic
+// order — so the result is stable regardless of iteration order.
+func preferEndpointPath(candidate, current string) bool {
+	if c, k := strings.Count(candidate, "{"), strings.Count(current, "{"); c != k {
+		return c < k
+	}
+	if len(candidate) != len(current) {
+		return len(candidate) < len(current)
+	}
+	return candidate < current
 }
 
 // mapOperationToEndpoint maps OpenAPI operations to our endpoint keys
