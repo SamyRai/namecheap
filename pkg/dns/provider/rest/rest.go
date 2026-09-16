@@ -333,7 +333,7 @@ func (p *RESTProvider) Capabilities() dnsprovider.ProviderCapabilities {
 		CanUpdateRecord: p.hasEndpoint("update_record"),
 		CanDeleteRecord: canDelete,
 		// Naive bulk replace requires delete and create
-		CanBulkReplace:  canDelete && canCreate,
+		CanBulkReplace: canDelete && canCreate,
 	}
 }
 
