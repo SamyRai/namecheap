@@ -314,6 +314,94 @@ func (s *ServiceTestSuite) TestService_UpdateRecord_NotFound() {
 	s.Require().Error(err)
 }
 
+// apexTXTFixture mirrors the shape that exposed this: one hostname and type
+// carrying an SPF record alongside two provider verification tokens.
+func (s *ServiceTestSuite) apexTXTFixture(domain string) {
+	s.mock.records[domain] = []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeTXT, "google-site-verification=abc123", 1800, 0)),
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeTXT, "v=spf1 -all", 1800, 0)),
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeTXT, "hosted-email-verify=xyz789", 1800, 0)),
+	}
+}
+
+func (s *ServiceTestSuite) addressesOf(domain string) []string {
+	records, err := s.service.GetRecords(domain)
+	s.Require().NoError(err)
+	addresses := make([]string, 0, len(records))
+	for _, r := range records {
+		addresses = append(addresses, r.Address)
+	}
+	return addresses
+}
+
+// An ambiguous (hostname, type) must be refused outright. Previously the
+// update silently rewrote whichever record happened to come first, destroying
+// a verification token the caller never named.
+func (s *ServiceTestSuite) TestService_UpdateRecord_AmbiguousIsRefused() {
+	domain := testutil.ValidDomainFixture()
+	s.apexTXTFixture(domain)
+
+	newRecord := convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeTXT, "v=spf1 ip4:203.0.113.10 -all", 1800, 0))
+	err := s.service.UpdateRecord(domain, "@", dnsrecord.RecordTypeTXT, newRecord)
+
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "refusing to guess")
+
+	// Every original record must survive a refused update untouched.
+	addresses := s.addressesOf(domain)
+	s.Require().Len(addresses, 3)
+	s.Require().Contains(addresses, "google-site-verification=abc123")
+	s.Require().Contains(addresses, "v=spf1 -all")
+	s.Require().Contains(addresses, "hosted-email-verify=xyz789")
+}
+
+// matchValue selects one of several records sharing a hostname and type, and
+// must leave its siblings intact.
+func (s *ServiceTestSuite) TestService_UpdateRecordMatching_SelectsAndPreservesSiblings() {
+	domain := testutil.ValidDomainFixture()
+	s.apexTXTFixture(domain)
+
+	newRecord := convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeTXT, "v=spf1 ip4:203.0.113.10 -all", 1800, 0))
+	err := s.service.UpdateRecordMatching(domain, "@", dnsrecord.RecordTypeTXT, "v=spf1 -all", newRecord)
+	s.Require().NoError(err)
+
+	addresses := s.addressesOf(domain)
+	s.Require().Len(addresses, 3)
+	s.Require().Contains(addresses, "v=spf1 ip4:203.0.113.10 -all")
+	s.Require().NotContains(addresses, "v=spf1 -all")
+	s.Require().Contains(addresses, "google-site-verification=abc123")
+	s.Require().Contains(addresses, "hosted-email-verify=xyz789")
+}
+
+// A matchValue naming no existing record is not found, and changes nothing.
+func (s *ServiceTestSuite) TestService_UpdateRecordMatching_UnknownValueNotFound() {
+	domain := testutil.ValidDomainFixture()
+	s.apexTXTFixture(domain)
+
+	newRecord := convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeTXT, "v=spf1 ip4:203.0.113.10 -all", 1800, 0))
+	err := s.service.UpdateRecordMatching(domain, "@", dnsrecord.RecordTypeTXT, "v=spf1 include:absent.example -all", newRecord)
+	s.Require().Error(err)
+
+	s.Require().Len(s.addressesOf(domain), 3)
+}
+
+// The unambiguous single-record case must keep working without matchValue.
+func (s *ServiceTestSuite) TestService_UpdateRecord_SingleMatchStillWorks() {
+	domain := testutil.ValidDomainFixture()
+	s.mock.records[domain] = []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeTXT, "v=spf1 -all", 1800, 0)),
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
+	}
+
+	newRecord := convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeTXT, "v=spf1 ip4:203.0.113.10 -all", 1800, 0))
+	err := s.service.UpdateRecord(domain, "@", dnsrecord.RecordTypeTXT, newRecord)
+	s.Require().NoError(err)
+
+	addresses := s.addressesOf(domain)
+	s.Require().Len(addresses, 2)
+	s.Require().Contains(addresses, "v=spf1 ip4:203.0.113.10 -all")
+}
+
 func (s *ServiceTestSuite) TestService_DeleteRecord() {
 	domain := testutil.ValidDomainFixture()
 

@@ -3,6 +3,7 @@ package dns
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"zonekit/pkg/client"
@@ -131,6 +132,21 @@ func (s *Service) AddRecord(domainName string, record dnsrecord.Record) error {
 
 // UpdateRecord updates a DNS record by hostname and type
 func (s *Service) UpdateRecord(domainName string, hostname, recordType string, newRecord dnsrecord.Record) error {
+	return s.UpdateRecordMatching(domainName, hostname, recordType, "", newRecord)
+}
+
+// UpdateRecordMatching updates the DNS record identified by hostname and type,
+// narrowed to the record whose current value equals matchValue when that is
+// non-empty.
+//
+// (hostname, type) is NOT a unique key in DNS. An apex routinely carries
+// several TXT records at once — SPF, DMARC, and provider verification tokens
+// all live at `@`. Selecting one of them arbitrarily rewrites a record the
+// caller never named and destroys its previous contents, which is
+// unrecoverable without an external backup. So an ambiguous match is reported
+// as an error listing the candidates, rather than resolved by guessing; pass
+// matchValue to choose one deliberately.
+func (s *Service) UpdateRecordMatching(domainName string, hostname, recordType, matchValue string, newRecord dnsrecord.Record) error {
 	ctx := context.Background()
 	zoneID, err := s.resolveZoneID(ctx, domainName)
 	if err != nil {
@@ -143,21 +159,38 @@ func (s *Service) UpdateRecord(domainName string, hostname, recordType string, n
 		return fmt.Errorf("failed to get existing records: %w", err)
 	}
 
-	var recordID string
-	var foundIndex int
-	found := false
+	matches := make([]int, 0, 1)
 	for i, record := range existingRecords {
-		if record.HostName == hostname && record.RecordType == recordType {
-			recordID = record.ID
-			foundIndex = i
-			found = true
-			break
+		if record.HostName != hostname || record.RecordType != recordType {
+			continue
 		}
+		if matchValue != "" && record.Address != matchValue {
+			continue
+		}
+		matches = append(matches, i)
 	}
 
-	if !found {
+	switch len(matches) {
+	case 0:
+		if matchValue != "" {
+			return errors.NewNotFound("DNS record",
+				fmt.Sprintf("%s %s with value %q", hostname, recordType, matchValue))
+		}
 		return errors.NewNotFound("DNS record", fmt.Sprintf("%s %s", hostname, recordType))
+	case 1:
+	default:
+		values := make([]string, 0, len(matches))
+		for _, i := range matches {
+			values = append(values, strconv.Quote(existingRecords[i].Address))
+		}
+		return errors.NewInvalidInput("hostname", fmt.Sprintf(
+			"%d records match %s %s; refusing to guess which to replace. "+
+				"Re-run with --match-value to select one, or delete and re-add the set. Candidates: %s",
+			len(matches), hostname, recordType, strings.Join(values, ", ")))
 	}
+
+	foundIndex := matches[0]
+	recordID := existingRecords[foundIndex].ID
 
 	if s.provider.Capabilities().CanUpdateRecord && recordID != "" {
 		_, err := s.provider.UpdateRecord(ctx, zoneID, recordID, newRecord)
