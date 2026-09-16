@@ -11,9 +11,9 @@ import (
 
 // Mappings defines field mappings between our format and provider format
 type Mappings struct {
-	Request  FieldMapping
-	Response FieldMapping
-	ListPath string // JSON path to records array (e.g., "result" or "data.records")
+	Request      FieldMapping
+	Response     FieldMapping
+	ListPath     string // JSON path to records array (e.g., "result" or "data.records")
 	ResponsePath string // JSON path to single record response (e.g., "result" or "domain_record")
 
 	// Zone Mappings
@@ -179,7 +179,6 @@ func FromProviderZoneFormat(data map[string]interface{}, mappings Mappings) (pro
 
 	return zone, nil
 }
-
 
 // extractList is a helper to extract a list of maps from a JSON response
 func extractList(data interface{}, listPath string) ([]map[string]interface{}, error) {

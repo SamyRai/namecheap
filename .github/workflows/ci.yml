@@ -111,6 +111,9 @@ jobs:
       - name: Run Gosec Security Scanner
         uses: securego/gosec@master
         with:
-          args: './...'
+          # -no-fail is what actually makes findings non-blocking. The
+          # exit-code input below is not honoured on its own, which is why
+          # this job reported failure while printing a clean summary.
+          args: '-no-fail ./...'
           exit-code: '0'  # Don't fail build, just report issues
 
