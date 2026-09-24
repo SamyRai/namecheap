@@ -8,7 +8,9 @@ import (
 	"text/tabwriter"
 
 	"zonekit/internal/cmdutil"
+	"zonekit/pkg/config"
 	"zonekit/pkg/dns"
+	"zonekit/pkg/dns/provider/cloudflare"
 	"zonekit/pkg/dns/zonefile"
 	"zonekit/pkg/dnsrecord"
 
@@ -21,6 +23,25 @@ import (
 // substitute a service backed by a mock provider instead of the real
 // Namecheap client, without any network access.
 var newDNSService = dns.NewService
+
+// dnsServiceForAccount builds the DNS service for the account's provider.
+// Namecheap goes through newDNSService (swappable in tests); Cloudflare uses
+// the typed provider, which accepts a domain name wherever a zone ID is
+// expected and resolves it to the Cloudflare zone ID.
+func dnsServiceForAccount(accountConfig *config.AccountConfig) (*dns.Service, error) {
+	if accountConfig.GetProvider() == config.ProviderCloudflare {
+		cf, err := cloudflare.NewFromAccount(accountConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Cloudflare provider: %w", err)
+		}
+		return dns.NewServiceWithProvider(cloudflare.ByDomain(cf)), nil
+	}
+	ncClient, err := cmdutil.CreateClient(accountConfig)
+	if err != nil {
+		return nil, err
+	}
+	return newDNSService(ncClient), nil
+}
 
 // JSON/YAML result map keys reused across several commands in this file.
 const (
@@ -118,13 +139,11 @@ var dnsListCmd = &cobra.Command{
 		}
 
 		// Create client and display account info
-		ncClient, err := cmdutil.CreateClient(accountConfig)
+		dnsService, err := dnsServiceForAccount(accountConfig)
 		if err != nil {
 			return err
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
-
-		dnsService := newDNSService(ncClient)
 
 		var records []dnsrecord.Record
 		if recordType != "" {
@@ -236,7 +255,7 @@ var dnsAddCmd = &cobra.Command{
 		}
 
 		// Create client and display account info
-		ncClient, err := cmdutil.CreateClient(accountConfig)
+		dnsService, err := dnsServiceForAccount(accountConfig)
 		if err != nil {
 			return err
 		}
@@ -249,8 +268,6 @@ var dnsAddCmd = &cobra.Command{
 			TTL:        ttl,
 			MXPref:     mxPref,
 		}
-
-		dnsService := newDNSService(ncClient)
 
 		// Validate record
 		if err := dnsService.ValidateRecord(record); err != nil {
@@ -312,7 +329,7 @@ var dnsUpdateCmd = &cobra.Command{
 		}
 
 		// Create client and display account info
-		ncClient, err := cmdutil.CreateClient(accountConfig)
+		dnsService, err := dnsServiceForAccount(accountConfig)
 		if err != nil {
 			return err
 		}
@@ -325,8 +342,6 @@ var dnsUpdateCmd = &cobra.Command{
 			TTL:        ttl,
 			MXPref:     mxPref,
 		}
-
-		dnsService := newDNSService(ncClient)
 
 		// Validate record
 		if err := dnsService.ValidateRecord(newRecord); err != nil {
@@ -375,13 +390,11 @@ var dnsDeleteCmd = &cobra.Command{
 		}
 
 		// Create client and display account info
-		ncClient, err := cmdutil.CreateClient(accountConfig)
+		dnsService, err := dnsServiceForAccount(accountConfig)
 		if err != nil {
 			return err
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
-
-		dnsService := newDNSService(ncClient)
 
 		if dryRun {
 			plan, err := dnsService.PlanDeleteRecord(domainName, hostname, recordType)
@@ -435,13 +448,11 @@ Requires --confirm (refused otherwise, even with --dry-run). Combine with
 		}
 
 		// Create client and display account info
-		ncClient, err := cmdutil.CreateClient(accountConfig)
+		dnsService, err := dnsServiceForAccount(accountConfig)
 		if err != nil {
 			return err
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
-
-		dnsService := newDNSService(ncClient)
 
 		if dryRun {
 			plans, err := dnsService.PlanClear(domainName)
@@ -507,13 +518,11 @@ operations:
 		}
 
 		// Create client and display account info
-		ncClient, err := cmdutil.CreateClient(accountConfig)
+		dnsService, err := dnsServiceForAccount(accountConfig)
 		if err != nil {
 			return err
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
-
-		dnsService := newDNSService(ncClient)
 
 		// Parse the operations file
 		operations, err := parseBulkOperationsFile(operationsFile)
@@ -621,7 +630,7 @@ exists, ensure refuses rather than guess which to update.`,
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		ncClient, err := cmdutil.CreateClient(accountConfig)
+		dnsService, err := dnsServiceForAccount(accountConfig)
 		if err != nil {
 			return err
 		}
@@ -634,8 +643,6 @@ exists, ensure refuses rather than guess which to update.`,
 			TTL:        ttl,
 			MXPref:     mxPref,
 		}
-
-		dnsService := newDNSService(ncClient)
 
 		var result dns.EnsureResult
 		if dryRun {
@@ -703,8 +710,7 @@ them.`,
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client and display account info
-		client, err := cmdutil.CreateClient(accountConfig)
+		dnsService, err := dnsServiceForAccount(accountConfig)
 		if err != nil {
 			return err
 		}
@@ -716,13 +722,15 @@ them.`,
 		}
 		fmt.Println()
 
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		confirm, _ := cmd.Flags().GetBool("confirm")
-		if !confirm {
-			fmt.Println("Use --confirm to apply these changes.")
+		if dryRun || !confirm {
+			if !dryRun {
+				fmt.Println("Use --confirm to apply these changes.")
+			}
 			return nil
 		}
 
-		dnsService := dns.NewService(client)
 		if err := dnsService.SetRecords(domainName, records); err != nil {
 			return fmt.Errorf("failed to import DNS records: %w", err)
 		}
@@ -751,14 +759,12 @@ var dnsExportCmd = &cobra.Command{
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Create client and display account info
-		client, err := cmdutil.CreateClient(accountConfig)
+		dnsService, err := dnsServiceForAccount(accountConfig)
 		if err != nil {
 			return err
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
 
-		dnsService := dns.NewService(client)
 		records, err := dnsService.GetRecords(domainName)
 		if err != nil {
 			return fmt.Errorf("failed to get DNS records: %w", err)
@@ -831,6 +837,7 @@ func init() {
 
 	// Flags for dns import
 	dnsImportCmd.Flags().BoolP("confirm", "y", false, "Confirm the import (replaces all existing records)")
+	dnsImportCmd.Flags().Bool("dry-run", false, "List the records that would replace the zone without making any API writes (overrides --confirm)")
 }
 
 // parseBulkOperationsFile parses a YAML file containing bulk DNS operations
