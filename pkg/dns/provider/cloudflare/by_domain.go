@@ -36,7 +36,7 @@ func (d *DomainAddressed) zoneID(ctx context.Context, zone string) (string, erro
 	if ok {
 		return id, nil
 	}
-	z, err := d.Provider.ZoneByName(ctx, zone)
+	z, err := d.ZoneByName(ctx, zone)
 	if err != nil {
 		return "", err
 	}
