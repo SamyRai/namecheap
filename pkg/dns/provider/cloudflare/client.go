@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"zonekit/pkg/errors"
+	"go.glpx.pro/zonekit/pkg/errors"
 )
 
 // listPerPage is the page size used for every paginated list call. Free

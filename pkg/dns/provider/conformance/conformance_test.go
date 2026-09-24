@@ -3,7 +3,7 @@ package conformance
 import (
 	"testing"
 
-	"zonekit/pkg/dns/provider"
+	"go.glpx.pro/zonekit/pkg/dns/provider"
 )
 
 func TestMockProviderConformance(t *testing.T) {

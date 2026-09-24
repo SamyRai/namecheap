@@ -5,7 +5,7 @@ import (
 	"net"
 	"strings"
 
-	"zonekit/pkg/validation"
+	"go.glpx.pro/zonekit/pkg/validation"
 )
 
 // ValidateDomain validates a domain name format.

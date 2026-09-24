@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"zonekit/pkg/config"
+	"go.glpx.pro/zonekit/pkg/config"
 )
 
 // TokenScope selects which Cloudflare endpoint a token verifies against.

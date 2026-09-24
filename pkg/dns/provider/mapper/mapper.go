@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"strings"
 
-	"zonekit/pkg/dns/provider"
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/dns/provider"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 )
 
 // Mappings defines field mappings between our format and provider format

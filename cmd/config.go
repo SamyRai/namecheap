@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"zonekit/internal/cmdutil"
-	"zonekit/pkg/config"
-	"zonekit/pkg/domain"
+	"go.glpx.pro/zonekit/internal/cmdutil"
+	"go.glpx.pro/zonekit/pkg/config"
+	"go.glpx.pro/zonekit/pkg/domain"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

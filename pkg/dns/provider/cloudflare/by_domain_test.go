@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 )
 
 const testZoneID = "0123456789abcdef0123456789abcdef"

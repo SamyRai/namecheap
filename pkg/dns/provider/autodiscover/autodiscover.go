@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	dnsprovider "zonekit/pkg/dns/provider"
-	"zonekit/pkg/dns/provider/builder"
-	"zonekit/pkg/dns/provider/openapi"
+	dnsprovider "go.glpx.pro/zonekit/pkg/dns/provider"
+	"go.glpx.pro/zonekit/pkg/dns/provider/builder"
+	"go.glpx.pro/zonekit/pkg/dns/provider/openapi"
 )
 
 // DiscoverAndRegister discovers all providers from subdirectories and registers them

@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 )
 
 // Zone represents a DNS zone

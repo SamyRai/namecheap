@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"zonekit/pkg/dns/provider"
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/dns/provider"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 )
 
 // MockProvider implements the Provider interface for testing

@@ -3,7 +3,7 @@ package cloudflare
 import (
 	"testing"
 
-	"zonekit/pkg/dns/provider/conformance"
+	"go.glpx.pro/zonekit/pkg/dns/provider/conformance"
 )
 
 // TestConformance runs zonekit's shared provider conformance suite

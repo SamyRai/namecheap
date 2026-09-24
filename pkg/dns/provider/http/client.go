@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"zonekit/pkg/errors"
+	"go.glpx.pro/zonekit/pkg/errors"
 )
 
 // Client is a generic HTTP client for DNS provider APIs

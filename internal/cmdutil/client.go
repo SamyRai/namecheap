@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"zonekit/pkg/client"
-	"zonekit/pkg/config"
+	"go.glpx.pro/zonekit/pkg/client"
+	"go.glpx.pro/zonekit/pkg/config"
 )
 
 // CreateClient creates a client from an account configuration.

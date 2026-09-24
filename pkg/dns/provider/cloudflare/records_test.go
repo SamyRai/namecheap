@@ -3,7 +3,7 @@ package cloudflare
 import (
 	"testing"
 
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 
 	"github.com/stretchr/testify/require"
 )

@@ -6,8 +6,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
-	"zonekit/internal/cmdutil"
-	"zonekit/pkg/domain"
+	"go.glpx.pro/zonekit/internal/cmdutil"
+	"go.glpx.pro/zonekit/pkg/domain"
 )
 
 // domainDTO is the stable, snake_case wire shape for a domain in json/yaml

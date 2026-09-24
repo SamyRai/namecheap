@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 )
 
 // mockProviderForRegistry is a mock implementation of the Provider interface for registry testing

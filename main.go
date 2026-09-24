@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"zonekit/cmd"
+	"go.glpx.pro/zonekit/cmd"
 )
 
 func main() {

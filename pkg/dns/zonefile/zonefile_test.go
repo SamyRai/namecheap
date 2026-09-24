@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 )
 
 const (

@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"sync"
 
-	dnsprovider "zonekit/pkg/dns/provider"
-	"zonekit/pkg/dnsrecord"
+	dnsprovider "go.glpx.pro/zonekit/pkg/dns/provider"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 )
 
 var zoneIDPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)

@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"zonekit/pkg/dns"
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/dns"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 )
 
 // Namecheap-specific pseudo-record types. These configure the registrar's

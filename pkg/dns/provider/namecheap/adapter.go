@@ -5,11 +5,11 @@ import (
 	"fmt"
 
 	"github.com/namecheap/go-namecheap-sdk/v2/namecheap"
-	"zonekit/pkg/client"
-	dnsprovider "zonekit/pkg/dns/provider"
-	"zonekit/pkg/dnsrecord"
-	"zonekit/pkg/errors"
-	"zonekit/pkg/pointer"
+	"go.glpx.pro/zonekit/pkg/client"
+	dnsprovider "go.glpx.pro/zonekit/pkg/dns/provider"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/errors"
+	"go.glpx.pro/zonekit/pkg/pointer"
 )
 
 // NamecheapProvider implements the DNS Provider interface for Namecheap

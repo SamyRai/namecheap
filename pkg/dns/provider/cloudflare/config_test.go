@@ -3,7 +3,7 @@ package cloudflare
 import (
 	"testing"
 
-	"zonekit/pkg/config"
+	"go.glpx.pro/zonekit/pkg/config"
 
 	"github.com/stretchr/testify/require"
 )

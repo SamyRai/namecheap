@@ -7,12 +7,12 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"zonekit/internal/cmdutil"
-	"zonekit/pkg/config"
-	"zonekit/pkg/dns"
-	"zonekit/pkg/dns/provider/cloudflare"
-	"zonekit/pkg/dns/zonefile"
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/internal/cmdutil"
+	"go.glpx.pro/zonekit/pkg/config"
+	"go.glpx.pro/zonekit/pkg/dns"
+	"go.glpx.pro/zonekit/pkg/dns/provider/cloudflare"
+	"go.glpx.pro/zonekit/pkg/dns/zonefile"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"

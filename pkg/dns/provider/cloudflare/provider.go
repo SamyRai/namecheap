@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net/url"
 
-	"zonekit/pkg/config"
-	dnsprovider "zonekit/pkg/dns/provider"
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/config"
+	dnsprovider "go.glpx.pro/zonekit/pkg/dns/provider"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 )
 
 // providerName is the name this provider registers under and returns

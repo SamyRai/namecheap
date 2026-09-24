@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	dnsprovider "zonekit/pkg/dns/provider"
+	dnsprovider "go.glpx.pro/zonekit/pkg/dns/provider"
 )
 
 // Compile-time assertion that Provider satisfies the optional

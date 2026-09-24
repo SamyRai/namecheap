@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	dnsprovider "zonekit/pkg/dns/provider"
-	httpprovider "zonekit/pkg/dns/provider/http"
-	"zonekit/pkg/dns/provider/mapper"
-	"zonekit/pkg/dnsrecord"
-	"zonekit/pkg/errors"
+	dnsprovider "go.glpx.pro/zonekit/pkg/dns/provider"
+	httpprovider "go.glpx.pro/zonekit/pkg/dns/provider/http"
+	"go.glpx.pro/zonekit/pkg/dns/provider/mapper"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/errors"
 )
 
 // RESTProvider is a generic REST-based DNS provider

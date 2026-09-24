@@ -7,12 +7,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"zonekit/internal/cmdutil"
-	"zonekit/pkg/config"
-	"zonekit/pkg/dns/provider/autodiscover"
-	"zonekit/pkg/plugin"
-	"zonekit/pkg/plugin/service"
-	"zonekit/pkg/version"
+	"go.glpx.pro/zonekit/internal/cmdutil"
+	"go.glpx.pro/zonekit/pkg/config"
+	"go.glpx.pro/zonekit/pkg/dns/provider/autodiscover"
+	"go.glpx.pro/zonekit/pkg/plugin"
+	"go.glpx.pro/zonekit/pkg/plugin/service"
+	"go.glpx.pro/zonekit/pkg/version"
 )
 
 var cfgFile string

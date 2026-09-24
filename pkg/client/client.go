@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/namecheap/go-namecheap-sdk/v2/namecheap"
-	"zonekit/pkg/config"
+	"go.glpx.pro/zonekit/pkg/config"
 )
 
 // Client wraps the Namecheap SDK client with additional functionality

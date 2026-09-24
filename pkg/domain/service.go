@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"zonekit/pkg/client"
-	"zonekit/pkg/pointer"
+	"go.glpx.pro/zonekit/pkg/client"
+	"go.glpx.pro/zonekit/pkg/pointer"
 
 	"github.com/namecheap/go-namecheap-sdk/v2/namecheap"
 )

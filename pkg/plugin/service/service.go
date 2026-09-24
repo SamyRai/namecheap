@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"zonekit/pkg/dns"
-	"zonekit/pkg/dnsrecord"
-	"zonekit/pkg/plugin"
+	"go.glpx.pro/zonekit/pkg/dns"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/plugin"
 )
 
 // ServicePlugin is a generic plugin that loads service integration configurations

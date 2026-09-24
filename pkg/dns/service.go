@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"strings"
 
-	"zonekit/pkg/client"
-	"zonekit/pkg/dns/provider"
-	"zonekit/pkg/dns/provider/namecheap"
-	"zonekit/pkg/dnsrecord"
-	"zonekit/pkg/errors"
+	"go.glpx.pro/zonekit/pkg/client"
+	"go.glpx.pro/zonekit/pkg/dns/provider"
+	"go.glpx.pro/zonekit/pkg/dns/provider/namecheap"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/errors"
 )
 
 // Service provides DNS record management operations

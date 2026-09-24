@@ -3,7 +3,7 @@ package builder
 import (
 	"testing"
 
-	"zonekit/pkg/dns/provider/openapi"
+	"go.glpx.pro/zonekit/pkg/dns/provider/openapi"
 
 	"github.com/stretchr/testify/require"
 )

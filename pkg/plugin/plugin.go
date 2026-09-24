@@ -1,8 +1,8 @@
 package plugin
 
 import (
-	"zonekit/pkg/dns"
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/dns"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 )
 
 // Service defines the DNS service interface for plugins

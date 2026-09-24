@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"zonekit/internal/cmdutil"
-	"zonekit/pkg/dns"
-	"zonekit/pkg/plugin"
+	"go.glpx.pro/zonekit/internal/cmdutil"
+	"go.glpx.pro/zonekit/pkg/dns"
+	"go.glpx.pro/zonekit/pkg/plugin"
 )
 
 // serviceCmd represents the service command

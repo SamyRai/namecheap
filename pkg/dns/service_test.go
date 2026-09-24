@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"zonekit/internal/testutil"
-	"zonekit/pkg/dns/provider"
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/internal/testutil"
+	"go.glpx.pro/zonekit/pkg/dns/provider"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 )
 
 // mockProvider is a mock implementation of the Provider interface for testing

@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"zonekit/pkg/dnsrecord"
-	"zonekit/pkg/errors"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/errors"
 )
 
 // maxCommentLength is Cloudflare's Free-plan limit on a DNS record

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"zonekit/pkg/config"
+	"go.glpx.pro/zonekit/pkg/config"
 )
 
 // accountAddProvider backs the `account add --provider` flag.

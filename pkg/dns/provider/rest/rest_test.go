@@ -6,9 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	httpclient "zonekit/pkg/dns/provider/http"
-	"zonekit/pkg/dns/provider/mapper"
-	"zonekit/pkg/dnsrecord"
+	httpclient "go.glpx.pro/zonekit/pkg/dns/provider/http"
+	"go.glpx.pro/zonekit/pkg/dns/provider/mapper"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 
 	"github.com/stretchr/testify/require"
 )

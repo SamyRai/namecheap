@@ -11,11 +11,11 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/require"
 
-	"zonekit/pkg/client"
-	"zonekit/pkg/dns"
-	"zonekit/pkg/dns/provider"
-	"zonekit/pkg/dns/provider/conformance"
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/client"
+	"go.glpx.pro/zonekit/pkg/dns"
+	"go.glpx.pro/zonekit/pkg/dns/provider"
+	"go.glpx.pro/zonekit/pkg/dns/provider/conformance"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 )
 
 // --- test scaffolding --------------------------------------------------

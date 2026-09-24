@@ -1,4 +1,4 @@
-module zonekit
+module go.glpx.pro/zonekit
 
 go 1.23.0
 

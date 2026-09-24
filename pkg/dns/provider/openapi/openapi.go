@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	dnsprovider "zonekit/pkg/dns/provider"
+	dnsprovider "go.glpx.pro/zonekit/pkg/dns/provider"
 
 	"gopkg.in/yaml.v3"
 )

@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"testing"
 
-	dnsprovider "zonekit/pkg/dns/provider"
-	"zonekit/pkg/dnsrecord"
+	dnsprovider "go.glpx.pro/zonekit/pkg/dns/provider"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 
 	"github.com/stretchr/testify/require"
 )

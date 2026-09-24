@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"zonekit/internal/cmdutil"
-	"zonekit/pkg/domain"
+	"go.glpx.pro/zonekit/internal/cmdutil"
+	"go.glpx.pro/zonekit/pkg/domain"
 )
 
 // O1: domain list/info must emit stable snake_case fields. domain.Service

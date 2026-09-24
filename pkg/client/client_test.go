@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"zonekit/internal/testutil"
-	"zonekit/pkg/config"
+	"go.glpx.pro/zonekit/internal/testutil"
+	"go.glpx.pro/zonekit/pkg/config"
 )
 
 // ClientTestSuite is a test suite for client package

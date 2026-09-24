@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"zonekit/pkg/dnsrecord"
+	"go.glpx.pro/zonekit/pkg/dnsrecord"
 )
 
 // Parse reads a zone file previously produced by Format and returns the DNS

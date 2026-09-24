@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"go.glpx.pro/zonekit/internal/testutil"
 	"gopkg.in/yaml.v3"
-	"zonekit/internal/testutil"
 )
 
 const (
