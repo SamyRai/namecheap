@@ -33,7 +33,12 @@ jobs:
       - name: Get current version
         id: current_version
         run: |
-          CURRENT_VERSION=$(grep 'Version = ' pkg/version/version.go | sed 's/.*Version = "\(.*\)"/\1/')
+          # pkg/version.Version has no source-code literal to read (it is
+          # "dev" unless overridden by -ldflags at build time — see the
+          # Makefile and pkg/version/version.go). The version this workflow
+          # tracks is the latest existing release tag instead.
+          CURRENT_VERSION=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1 | sed 's/^v//')
+          CURRENT_VERSION="${CURRENT_VERSION:-0.0.0}"
           echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $CURRENT_VERSION"
 
@@ -67,16 +72,6 @@ jobs:
           echo "new=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "New version: $NEW_VERSION"
 
-      - name: Update version in code
-        run: |
-          NEW_VERSION="${{ steps.new_version.outputs.new }}"
-          sed -i "s/Version = \".*\"/Version = \"$NEW_VERSION\"/" pkg/version/version.go
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pkg/version/version.go
-          git commit -m "chore: bump version to $NEW_VERSION"
-          git push
-
       - name: Create tag
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.new }}"
@@ -94,6 +89,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: go.sum
+
       - name: Extract version from tag
         id: tag_version
         run: |
@@ -101,17 +102,19 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Tag version: $TAG"
 
-      - name: Check version in code
+      - name: Build with the tag version and verify it was injected
         run: |
           TAG_VERSION="${{ steps.tag_version.outputs.tag }}"
-          CODE_VERSION=$(grep 'Version = ' pkg/version/version.go | sed 's/.*Version = "\(.*\)"/\1/')
+          make build VERSION="$TAG_VERSION"
+          OUTPUT=$(./build/zonekit --version)
+          echo "$OUTPUT"
 
-          if [ "$TAG_VERSION" != "$CODE_VERSION" ]; then
-            echo "❌ Version mismatch!"
-            echo "Tag version: $TAG_VERSION"
-            echo "Code version: $CODE_VERSION"
-            exit 1
-          fi
-
-          echo "✅ Version matches: $TAG_VERSION"
+          case "$OUTPUT" in
+            *"$TAG_VERSION"*)
+              echo "✅ Built version matches tag: $TAG_VERSION" ;;
+            *)
+              echo "❌ Built version does not contain tag $TAG_VERSION"
+              exit 1
+              ;;
+          esac
 

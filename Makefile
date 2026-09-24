@@ -6,7 +6,21 @@
 BINARY_NAME=zonekit
 MAIN_PATH=./main.go
 BUILD_DIR=build
-GOFLAGS=-ldflags="-w -s"
+VERSION_PKG=go.glpx.pro/zonekit/pkg/version
+
+# VERSION defaults to the nearest git tag (falling back to "dev" outside a
+# git checkout, e.g. an extracted release tarball); override on the command
+# line for a specific release build: `make build VERSION=1.2.3`. Injected via
+# -ldflags so pkg/version.Version never needs a hardcoded, driftable literal
+# (O7 — see pkg/version/version.go).
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT := $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
+BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS = -w -s \
+	-X $(VERSION_PKG).Version=$(VERSION) \
+	-X $(VERSION_PKG).GitCommit=$(COMMIT) \
+	-X $(VERSION_PKG).BuildDate=$(BUILD_DATE)
+GOFLAGS=-ldflags="$(LDFLAGS)"
 
 # Default target
 help: ## Show this help message
@@ -95,17 +109,13 @@ config-example: ## Show example configuration
 	@cat configs/config.example.yaml
 
 # Version
-version: ## Show current version
-	@echo "Current version: $$(grep 'Version = ' pkg/version/version.go | sed 's/.*Version = "\(.*\)"/\1/')"
+version: ## Show the version that `make build` would inject
+	@echo "Version: $(VERSION)"
+	@echo "Commit:  $(COMMIT)"
 
-version-bump-patch: ## Bump patch version (0.1.0 -> 0.1.1)
-	@./scripts/bump-version.sh patch
-
-version-bump-minor: ## Bump minor version (0.1.0 -> 0.2.0)
-	@./scripts/bump-version.sh minor
-
-version-bump-major: ## Bump major version (0.1.0 -> 1.0.0)
-	@./scripts/bump-version.sh major
+# Releases are cut by pushing a git tag (`git tag vX.Y.Z && git push --tags`),
+# which .github/workflows/release.yml builds and injects via -ldflags above.
+# There is no source-code version literal to bump.
 
 # Release
 release-check: lint test ## Check if ready for release

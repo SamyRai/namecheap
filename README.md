@@ -316,6 +316,36 @@ make build
 make install
 ```
 
+## Using as a Library
+
+ZoneKit's module path is `go.glpx.pro/zonekit`, served by a Go vanity import
+server in front of this private Gitea repository. The packages under `pkg/`
+(for example `pkg/dns/provider`, `pkg/dns`, `pkg/client`, `pkg/config`,
+`pkg/domain`, `pkg/dnsrecord`, `pkg/validation`) are the public library
+surface and are safe to import directly; only packages under `internal/`
+(CLI-only helpers such as `internal/cmdutil`) are off-limits to importers.
+
+Because the repository behind `go.glpx.pro/zonekit` is private, `go get`
+resolves it over SSH via Gitea rather than a public checksum database.
+**Set `GOPRIVATE` before fetching it** so the Go toolchain skips the public
+module proxy and sum database for this host:
+
+```bash
+export GOPRIVATE=go.glpx.pro
+go get go.glpx.pro/zonekit/pkg/dns/provider
+```
+
+Then import it like any other module:
+
+```go
+import "go.glpx.pro/zonekit/pkg/dns/provider"
+```
+
+Fetching requires SSH access to `gitea.bk.glpx.pro` (the vanity server only
+serves the module-discovery metadata; `git`/`go` still clone the repository
+directly). See `docs/glpxctl.md` in the `cluster` repo for how CI consumers
+are granted read access.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

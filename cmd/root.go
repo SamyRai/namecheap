@@ -32,7 +32,7 @@ This tool allows you to:
 - Manage multiple DNS provider accounts
 - Support for multiple DNS providers (Namecheap, Cloudflare, and more)
 
-Current version: ` + version.Version + ` (pre-1.0.0)`,
+Use --version to print the build version and commit.`,
 	Version: version.String(),
 	// PersistentPreRunE runs for every command (including subcommands) before
 	// their own RunE. It rejects an unrecognized --output value up front so

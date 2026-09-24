@@ -6,9 +6,12 @@ import (
 )
 
 var (
-	// Version is the application version (semantic versioning)
-	// This should be updated when creating releases
-	Version = "0.1.0"
+	// Version is the application version. It is only meaningful when set at
+	// build time via -ldflags "-X go.glpx.pro/zonekit/pkg/version.Version=..."
+	// (see the Makefile and .github/workflows/release.yml); a `go build` or
+	// `go run` without that flag leaves it at "dev" rather than a stale
+	// hardcoded semver (O7).
+	Version = "dev"
 
 	// BuildDate is the build date (set during build)
 	BuildDate = "unknown"
