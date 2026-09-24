@@ -9,6 +9,7 @@ import (
 
 	"zonekit/internal/cmdutil"
 	"zonekit/pkg/dns"
+	"zonekit/pkg/dns/zonefile"
 	"zonekit/pkg/dnsrecord"
 
 	"github.com/spf13/cobra"
@@ -669,11 +670,32 @@ exists, ensure refuses rather than guess which to update.`,
 var dnsImportCmd = &cobra.Command{
 	Use:   "import <domain> <zone-file>",
 	Short: "Import DNS records from a zone file",
-	Long:  `Import DNS records from a standard DNS zone file format.`,
-	Args:  cobra.ExactArgs(2),
+	Long: `Import DNS records from a zone file (as produced by "zonekit dns export").
+
+Import REPLACES ALL existing DNS records for the domain with the records
+parsed from the file. Review the listed records and pass --confirm to apply
+them.`,
+	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domainName := args[0]
 		zoneFile := args[1]
+
+		if err := dns.ValidateDomain(domainName); err != nil {
+			return fmt.Errorf("invalid domain: %w", err)
+		}
+
+		content, err := os.ReadFile(zoneFile)
+		if err != nil {
+			return fmt.Errorf("failed to read zone file: %w", err)
+		}
+
+		records, err := zonefile.Parse(string(content))
+		if err != nil {
+			return fmt.Errorf("failed to parse zone file %s: %w", zoneFile, err)
+		}
+		if len(records) == 0 {
+			return fmt.Errorf("no records found in %s", zoneFile)
+		}
 
 		// Get current account configuration
 		accountConfig, err := GetCurrentAccount()
@@ -681,17 +703,32 @@ var dnsImportCmd = &cobra.Command{
 			return fmt.Errorf("failed to get account configuration: %w", err)
 		}
 
-		// Show which account is being used
-		fmt.Printf("Using account: %s (%s)\n", accountConfig.Username, accountConfig.Description)
+		// Create client and display account info
+		client, err := cmdutil.CreateClient(accountConfig)
+		if err != nil {
+			return err
+		}
+		cmdutil.DisplayAccountInfo(accountConfig)
+
+		fmt.Printf("This will replace ALL DNS records for %s with %d record(s) from %s:\n", domainName, len(records), zoneFile)
+		for _, record := range records {
+			fmt.Printf("  %s IN %s %s\n", record.HostName, record.RecordType, record.Address)
+		}
 		fmt.Println()
 
-		// TODO: Implement zone file import
-		// This would involve:
-		// 1. Parsing the zone file format
-		// 2. Converting to DNS records
-		// 3. Setting all records at once
+		confirm, _ := cmd.Flags().GetBool("confirm")
+		if !confirm {
+			fmt.Println("Use --confirm to apply these changes.")
+			return nil
+		}
 
-		return fmt.Errorf("zone file import not yet implemented - TODO: parse %s and import to %s", zoneFile, domainName)
+		dnsService := dns.NewService(client)
+		if err := dnsService.SetRecords(domainName, records); err != nil {
+			return fmt.Errorf("failed to import DNS records: %w", err)
+		}
+
+		fmt.Printf("✅ Successfully imported %d record(s) from %s to %s\n", len(records), zoneFile, domainName)
+		return nil
 	},
 }
 
@@ -728,7 +765,7 @@ var dnsExportCmd = &cobra.Command{
 		}
 
 		// Convert records to zone file format
-		zoneContent := formatAsZoneFile(domainName, records)
+		zoneContent := zonefile.Format(domainName, records)
 
 		if outputFile != "" {
 			// Write to file
@@ -791,73 +828,9 @@ func init() {
 	dnsEnsureCmd.Flags().IntP("ttl", "", 0, "TTL value (Time To Live)")
 	dnsEnsureCmd.Flags().IntP("mx-pref", "", 0, "MX preference value (for MX records)")
 	dnsEnsureCmd.Flags().Bool("dry-run", false, "Show what would change (created/updated/unchanged) without making any API writes")
-}
 
-// formatAsZoneFile converts DNS records to BIND zone file format
-func formatAsZoneFile(domainName string, records []dnsrecord.Record) string {
-	var sb strings.Builder
-
-	// Write SOA record (placeholder - would need proper SOA data)
-	sb.WriteString(fmt.Sprintf("$ORIGIN %s.\n", domainName))
-	sb.WriteString(fmt.Sprintf("@ IN SOA ns1.namecheap.com. admin.%s. (\n", domainName))
-	sb.WriteString("\t1 ; serial\n")
-	sb.WriteString("\t3600 ; refresh\n")
-	sb.WriteString("\t1800 ; retry\n")
-	sb.WriteString("\t604800 ; expire\n")
-	sb.WriteString("\t3600 ; minimum TTL\n")
-	sb.WriteString(")\n\n")
-
-	// Write NS records (placeholder)
-	sb.WriteString("; Name servers\n")
-	sb.WriteString("@ IN NS ns1.namecheap.com.\n")
-	sb.WriteString("@ IN NS ns2.namecheap.com.\n\n")
-
-	// Write other records
-	for _, record := range records {
-		hostname := record.HostName
-		if hostname == "@" {
-			hostname = ""
-		}
-
-		ttl := ""
-		if record.TTL > 0 {
-			ttl = fmt.Sprintf("\t%d", record.TTL)
-		} else {
-			ttl = "\t3600" // default TTL
-		}
-
-		switch record.RecordType {
-		case dnsrecord.RecordTypeA:
-			sb.WriteString(fmt.Sprintf("%s%s IN A %s\n", hostname, ttl, record.Address))
-		case dnsrecord.RecordTypeAAAA:
-			sb.WriteString(fmt.Sprintf("%s%s IN AAAA %s\n", hostname, ttl, record.Address))
-		case dnsrecord.RecordTypeCNAME:
-			sb.WriteString(fmt.Sprintf("%s%s IN CNAME %s\n", hostname, ttl, record.Address))
-		case dnsrecord.RecordTypeMX:
-			mxPref := record.MXPref
-			if mxPref == 0 {
-				mxPref = 10 // default priority
-			}
-			sb.WriteString(fmt.Sprintf("%s%s IN MX %d %s\n", hostname, ttl, mxPref, record.Address))
-		case dnsrecord.RecordTypeTXT:
-			// Handle long TXT records by splitting if necessary
-			txtValue := record.Address
-			if !strings.HasPrefix(txtValue, "\"") {
-				txtValue = fmt.Sprintf("\"%s\"", txtValue)
-			}
-			sb.WriteString(fmt.Sprintf("%s%s IN TXT %s\n", hostname, ttl, txtValue))
-		case dnsrecord.RecordTypeNS:
-			sb.WriteString(fmt.Sprintf("%s%s IN NS %s\n", hostname, ttl, record.Address))
-		case dnsrecord.RecordTypeSRV:
-			// SRV records need special parsing, for now just output as-is
-			sb.WriteString(fmt.Sprintf("%s%s IN SRV %s\n", hostname, ttl, record.Address))
-		default:
-			// For unknown types, output as generic record
-			sb.WriteString(fmt.Sprintf("%s%s IN %s %s\n", hostname, ttl, record.RecordType, record.Address))
-		}
-	}
-
-	return sb.String()
+	// Flags for dns import
+	dnsImportCmd.Flags().BoolP("confirm", "y", false, "Confirm the import (replaces all existing records)")
 }
 
 // parseBulkOperationsFile parses a YAML file containing bulk DNS operations
