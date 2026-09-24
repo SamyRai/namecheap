@@ -777,6 +777,290 @@ func (s *ServiceTestSuite) TestService_NewServiceWithProviderName_NotFound() {
 	s.Require().Nil(service)
 }
 
+// snapshotRecords deep-copies the mock's current record set for a domain, so
+// a Plan*/dry-run test can assert nothing changed afterward.
+func (s *ServiceTestSuite) snapshotRecords(domain string) []dnsrecord.Record {
+	src := s.mock.records[domain]
+	out := make([]dnsrecord.Record, len(src))
+	copy(out, src)
+	return out
+}
+
+// --- O3: dry-run Plan* methods must never write ---------------------------
+
+func (s *ServiceTestSuite) TestService_PlanAddRecord_NoWrites() {
+	domain := testutil.ValidDomainFixture()
+	s.mock.records[domain] = []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
+	}
+	before := s.snapshotRecords(domain)
+
+	newRecord := convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.2", 1800, 0))
+	plan, err := s.service.PlanAddRecord(newRecord)
+	s.Require().NoError(err)
+	s.Require().Equal(PlanActionCreate, plan.Action)
+	s.Require().Nil(plan.Before)
+	s.Require().NotNil(plan.After)
+	s.Require().Equal(newRecord, *plan.After)
+
+	s.Require().Equal(before, s.snapshotRecords(domain))
+}
+
+func (s *ServiceTestSuite) TestService_PlanAddRecord_InvalidRecord() {
+	invalid := convertDNSRecord(testutil.DNSRecordFixtureWithValues("", dnsrecord.RecordTypeA, "192.168.1.1", 0, 0))
+	_, err := s.service.PlanAddRecord(invalid)
+	s.Require().Error(err)
+}
+
+func (s *ServiceTestSuite) TestService_PlanUpdateRecordMatching_NoWrites() {
+	domain := testutil.ValidDomainFixture()
+	s.mock.records[domain] = []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
+	}
+	before := s.snapshotRecords(domain)
+
+	newRecord := convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.100", 3600, 0))
+	plan, err := s.service.PlanUpdateRecordMatching(domain, "@", dnsrecord.RecordTypeA, "", newRecord)
+	s.Require().NoError(err)
+	s.Require().Equal(PlanActionUpdate, plan.Action)
+	s.Require().NotNil(plan.Before)
+	s.Require().Equal("192.168.1.1", plan.Before.Address)
+	s.Require().NotNil(plan.After)
+	s.Require().Equal("192.168.1.100", plan.After.Address)
+
+	s.Require().Equal(before, s.snapshotRecords(domain))
+}
+
+func (s *ServiceTestSuite) TestService_PlanUpdateRecordMatching_AmbiguousIsRefused() {
+	domain := testutil.ValidDomainFixture()
+	s.apexTXTFixture(domain)
+	before := s.snapshotRecords(domain)
+
+	newRecord := convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeTXT, "v=spf1 ip4:203.0.113.10 -all", 1800, 0))
+	_, err := s.service.PlanUpdateRecordMatching(domain, "@", dnsrecord.RecordTypeTXT, "", newRecord)
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "refusing to guess")
+
+	s.Require().Equal(before, s.snapshotRecords(domain))
+}
+
+func (s *ServiceTestSuite) TestService_PlanDeleteRecord_NoWrites() {
+	domain := testutil.ValidDomainFixture()
+	s.mock.records[domain] = []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.2", 1800, 0)),
+	}
+	before := s.snapshotRecords(domain)
+
+	plan, err := s.service.PlanDeleteRecord(domain, "@", dnsrecord.RecordTypeA)
+	s.Require().NoError(err)
+	s.Require().Equal(PlanActionDelete, plan.Action)
+	s.Require().NotNil(plan.Before)
+	s.Require().Equal("192.168.1.1", plan.Before.Address)
+	s.Require().Nil(plan.After)
+
+	s.Require().Equal(before, s.snapshotRecords(domain))
+}
+
+func (s *ServiceTestSuite) TestService_PlanDeleteRecord_NotFound() {
+	domain := testutil.ValidDomainFixture()
+	s.mock.records[domain] = []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
+	}
+	_, err := s.service.PlanDeleteRecord(domain, "www", dnsrecord.RecordTypeA)
+	s.Require().Error(err)
+}
+
+func (s *ServiceTestSuite) TestService_PlanClear_NoWrites() {
+	domain := testutil.ValidDomainFixture()
+	s.mock.records[domain] = []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.2", 1800, 0)),
+	}
+	before := s.snapshotRecords(domain)
+
+	plans, err := s.service.PlanClear(domain)
+	s.Require().NoError(err)
+	s.Require().Len(plans, 2)
+	for _, p := range plans {
+		s.Require().Equal(PlanActionDelete, p.Action)
+		s.Require().NotNil(p.Before)
+	}
+
+	s.Require().Equal(before, s.snapshotRecords(domain))
+}
+
+func (s *ServiceTestSuite) TestService_PlanBulkUpdate_NoWrites() {
+	domain := testutil.ValidDomainFixture()
+	s.mock.records[domain] = []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
+	}
+	before := s.snapshotRecords(domain)
+
+	operations := []BulkOperation{
+		{Action: BulkActionAdd, Record: convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.2", 1800, 0))},
+		{Action: BulkActionUpdate, Record: convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.100", 3600, 0))},
+	}
+
+	plans, err := s.service.PlanBulkUpdate(domain, operations)
+	s.Require().NoError(err)
+	s.Require().Len(plans, 2)
+	s.Require().Equal(PlanActionCreate, plans[0].Action)
+	s.Require().Equal(PlanActionUpdate, plans[1].Action)
+	s.Require().Equal("192.168.1.1", plans[1].Before.Address)
+	s.Require().Equal("192.168.1.100", plans[1].After.Address)
+
+	s.Require().Equal(before, s.snapshotRecords(domain))
+}
+
+func (s *ServiceTestSuite) TestService_PlanBulkUpdate_UpdateNotFound() {
+	domain := testutil.ValidDomainFixture()
+	s.mock.records[domain] = []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
+	}
+	operations := []BulkOperation{
+		{Action: BulkActionUpdate, Record: convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.2", 1800, 0))},
+	}
+	_, err := s.service.PlanBulkUpdate(domain, operations)
+	s.Require().Error(err)
+}
+
+// --- O4: dns ensure ---------------------------------------------------------
+
+func (s *ServiceTestSuite) TestService_Ensure_CreatesWhenAbsent() {
+	domain := testutil.ValidDomainFixture()
+
+	record := convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0))
+	result, err := s.service.Ensure(domain, record)
+	s.Require().NoError(err)
+	s.Require().Equal(EnsureStatusCreated, result.Status)
+	s.Require().Equal("192.168.1.1", result.Record.Address)
+
+	records, err := s.service.GetRecords(domain)
+	s.Require().NoError(err)
+	s.Require().Len(records, 1)
+}
+
+func (s *ServiceTestSuite) TestService_Ensure_SecondRunIsUnchanged() {
+	domain := testutil.ValidDomainFixture()
+	record := convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0))
+
+	first, err := s.service.Ensure(domain, record)
+	s.Require().NoError(err)
+	s.Require().Equal(EnsureStatusCreated, first.Status)
+
+	second, err := s.service.Ensure(domain, record)
+	s.Require().NoError(err)
+	s.Require().Equal(EnsureStatusUnchanged, second.Status)
+
+	records, err := s.service.GetRecords(domain)
+	s.Require().NoError(err)
+	s.Require().Len(records, 1, "a repeated ensure must not create a duplicate")
+}
+
+func (s *ServiceTestSuite) TestService_Ensure_UpdatesWhenValueDiffers() {
+	domain := testutil.ValidDomainFixture()
+	s.mock.records[domain] = []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
+	}
+
+	record := convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.2", 1800, 0))
+	result, err := s.service.Ensure(domain, record)
+	s.Require().NoError(err)
+	s.Require().Equal(EnsureStatusUpdated, result.Status)
+
+	records, err := s.service.GetRecords(domain)
+	s.Require().NoError(err)
+	s.Require().Len(records, 1)
+	s.Require().Equal("192.168.1.2", records[0].Address)
+}
+
+func (s *ServiceTestSuite) TestService_Ensure_AmbiguousSingleValueTypeIsRefused() {
+	// Pre-existing ambiguous state (two A records at the same hostname)
+	// should never happen via this tool, but Ensure must refuse rather than
+	// guess which one to update if it finds it that way.
+	domain := testutil.ValidDomainFixture()
+	s.mock.records[domain] = []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.2", 1800, 0)),
+	}
+
+	record := convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.3", 1800, 0))
+	_, err := s.service.Ensure(domain, record)
+	s.Require().Error(err)
+}
+
+func (s *ServiceTestSuite) TestService_Ensure_MultiValueType_AddsAlongsideSiblings() {
+	domain := testutil.ValidDomainFixture()
+	s.apexTXTFixture(domain) // 3 existing TXT records at @
+
+	record := convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeTXT, "new-verification=zzz", 1800, 0))
+	result, err := s.service.Ensure(domain, record)
+	s.Require().NoError(err)
+	s.Require().Equal(EnsureStatusCreated, result.Status)
+
+	s.Require().Len(s.addressesOf(domain), 4)
+}
+
+func (s *ServiceTestSuite) TestService_Ensure_MultiValueType_SameValueIsUnchanged() {
+	domain := testutil.ValidDomainFixture()
+	s.apexTXTFixture(domain)
+
+	record := convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeTXT, "v=spf1 -all", 1800, 0))
+	result, err := s.service.Ensure(domain, record)
+	s.Require().NoError(err)
+	s.Require().Equal(EnsureStatusUnchanged, result.Status)
+	s.Require().Len(s.addressesOf(domain), 3, "unchanged must not add a duplicate")
+}
+
+func (s *ServiceTestSuite) TestService_Ensure_MultiValueType_SameValueDifferentTTLIsUpdated() {
+	domain := testutil.ValidDomainFixture()
+	s.apexTXTFixture(domain)
+
+	record := convertDNSRecord(testutil.DNSRecordFixtureWithValues("@", dnsrecord.RecordTypeTXT, "v=spf1 -all", 3600, 0))
+	result, err := s.service.Ensure(domain, record)
+	s.Require().NoError(err)
+	s.Require().Equal(EnsureStatusUpdated, result.Status)
+	s.Require().Len(s.addressesOf(domain), 3, "matching value must be updated in place, not duplicated")
+}
+
+func (s *ServiceTestSuite) TestService_Ensure_InvalidRecord() {
+	domain := testutil.ValidDomainFixture()
+	invalid := convertDNSRecord(testutil.DNSRecordFixtureWithValues("", dnsrecord.RecordTypeA, "192.168.1.1", 0, 0))
+	_, err := s.service.Ensure(domain, invalid)
+	s.Require().Error(err)
+}
+
+func (s *ServiceTestSuite) TestService_PlanEnsure_NoWrites() {
+	domain := testutil.ValidDomainFixture()
+	s.mock.records[domain] = []dnsrecord.Record{
+		convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0)),
+	}
+	before := s.snapshotRecords(domain)
+
+	record := convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.2", 1800, 0))
+	result, err := s.service.PlanEnsure(domain, record)
+	s.Require().NoError(err)
+	s.Require().Equal(EnsureStatusUpdated, result.Status)
+
+	s.Require().Equal(before, s.snapshotRecords(domain))
+}
+
+func (s *ServiceTestSuite) TestService_PlanEnsure_MatchesRealEnsureDecision() {
+	domain := testutil.ValidDomainFixture()
+	record := convertDNSRecord(testutil.DNSRecordFixtureWithValues("www", dnsrecord.RecordTypeA, "192.168.1.1", 1800, 0))
+
+	planned, err := s.service.PlanEnsure(domain, record)
+	s.Require().NoError(err)
+	s.Require().Equal(EnsureStatusCreated, planned.Status)
+
+	// The plan must not have created anything: doing the real Ensure right
+	// after must still report "created", not "unchanged".
+	actual, err := s.service.Ensure(domain, record)
+	s.Require().NoError(err)
+	s.Require().Equal(EnsureStatusCreated, actual.Status)
+}
+
 // convertDNSRecord converts testutil DNS record to dnsrecord.Record
 func convertDNSRecord(fixture testutil.TestDNSRecord) dnsrecord.Record {
 	return dnsrecord.Record{
