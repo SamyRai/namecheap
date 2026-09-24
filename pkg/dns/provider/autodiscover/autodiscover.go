@@ -43,6 +43,17 @@ func DiscoverAndRegister(baseDir string) error {
 			continue
 		}
 
+		// Skip cloudflare - it has a typed provider (see
+		// pkg/dns/provider/cloudflare) registered separately via
+		// cloudflare.Register(). The openapi.yaml in that directory is
+		// kept only as API-shape documentation and for the OpenAPI
+		// spec-conversion test; auto-registering it here would either
+		// shadow the typed provider or collide with it under the same
+		// "cloudflare" name.
+		if name == "cloudflare" {
+			continue
+		}
+
 		providerDir := filepath.Join(baseDir, name)
 
 		// OpenAPI-only approach: require openapi.yaml

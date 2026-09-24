@@ -7,13 +7,17 @@ This package provides a pluggable architecture for supporting multiple DNS provi
 ### Core Components
 
 1. **Provider Interface** (`provider.go`) - Standard interface all providers implement
-2. **Registry** (`registry.go`) - Thread-safe provider registry
-3. **HTTP Client** (`http/client.go`) - Generic HTTP client with retry, timeout, error handling
-4. **REST Provider** (`rest/rest.go`) - Generic REST-based provider implementation
-5. **Builder** (`builder/builder.go`) - Factory to create providers from config
-6. **Authentication** (`auth/auth.go`) - Authentication handlers (API key, Bearer, Basic, OAuth)
-7. **Field Mapper** (`mapper/mapper.go`) - Maps between our format and provider formats
-8. **Config Loader** (`config/config.go`) - Loads provider configurations from YAML files
+2. **ZoneConfigurer** (`zone_configurer.go`) - Optional capability interface for zone-level
+   configuration (SSL/TLS settings, bot management, security.txt, redirect rules, DNSSEC),
+   discovered via a `ProviderCapabilities` flag plus a type assertion. Not part of `Provider`
+   itself, since most providers have no equivalent.
+3. **Registry** (`registry.go`) - Thread-safe provider registry
+4. **HTTP Client** (`http/client.go`) - Generic HTTP client with retry, timeout, error handling
+5. **REST Provider** (`rest/rest.go`) - Generic REST-based provider implementation
+6. **Builder** (`builder/builder.go`) - Factory to create providers from config
+7. **Authentication** (`auth/auth.go`) - Authentication handlers (API key, Bearer, Basic, OAuth)
+8. **Field Mapper** (`mapper/mapper.go`) - Maps between our format and provider formats
+9. **Config Loader** (`config/config.go`) - Loads provider configurations from YAML files
 
 ### Directory Structure
 
@@ -44,9 +48,42 @@ pkg/dns/provider/
 │   ├── adapter.go
 │   └── config.yaml.example
 │
-└── cloudflare/          # Cloudflare provider (REST, config-based)
-    └── config.yaml.example
+└── cloudflare/          # Cloudflare provider (typed, hand-rolled net/http client)
+    ├── provider.go       # Provider: Name/ListZones/GetZone/ZoneByName/record CRUD/BulkReplaceRecords
+    ├── configurer.go      # ZoneConfigurer: zone settings, bot management, security.txt,
+    │                       #   redirect rules, DNSSEC
+    ├── records.go          # Record <-> wire conversion, TXT canonicalization, diff-based bulk replace
+    ├── client.go            # Low-level HTTP client: auth, pagination, error envelope
+    ├── config.go             # Config, FromAccount (zonekit account -> Config)
+    ├── openapi.yaml            # API-shape reference only - NOT used to build this provider
+    └── config.yaml.example      # Example account entry
 ```
+
+### The Cloudflare Provider (Typed)
+
+Unlike the generic REST/OpenAPI providers above, `cloudflare/` is a typed Go implementation
+registered under the name `"cloudflare"` - `autodiscover.DiscoverAndRegister` explicitly skips
+the `cloudflare/` directory so it never registers the generic OpenAPI adapter under that name
+instead. It uses a hand-rolled `net/http` client (no `cloudflare-go` dependency), Bearer token
+auth, and Cloudflare's `result_info` pagination.
+
+```go
+p, err := cloudflare.NewFromAccount(accountConfig) // from a zonekit config.AccountConfig
+// or: p, err := cloudflare.New(cloudflare.Config{APIToken: "...", AccountID: "..."})
+if err != nil { ... }
+
+if err := dnsprovider.Register(p); err != nil { ... } // makes it resolvable via provider.Get("cloudflare")
+```
+
+It additionally implements `dnsprovider.ZoneConfigurer` (see `Capabilities().CanConfigure*`)
+for zone settings (ssl, min_tls_version, tls_1_3, always_use_https, automatic_https_rewrites),
+bot management (read-modify-write, preserving fields it does not model), security.txt, redirect
+rules in the `http_request_dynamic_redirect` ruleset (merged by a caller-supplied `Ref` prefix,
+never dropping rules owned by someone else), and DNSSEC. Namecheap reports every
+`CanConfigure*` capability as `false` and does not implement `ZoneConfigurer`.
+
+`BulkReplaceRecords` diffs the desired record set against what's live and issues only the
+create/update/delete calls the diff requires - it never deletes everything and recreates it.
 
 ## Adding a New REST Provider
 

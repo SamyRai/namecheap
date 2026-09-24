@@ -1,47 +1,34 @@
-# Example Cloudflare DNS Provider Configuration
-# This shows how a REST-based provider could be configured
+# Example Cloudflare account entry for ~/.zonekit.yaml (or configs/config.example.yaml).
+#
+# This provider is NOT the generic OpenAPI/REST adapter described in
+# pkg/dns/provider/README.md - it is a typed Go provider
+# (pkg/dns/provider/cloudflare) registered under the name "cloudflare",
+# built from these account fields via cloudflare.NewFromAccount /
+# cloudflare.FromAccount. openapi.yaml in this directory is kept only as
+# API-shape reference documentation and is not used to build this
+# provider.
+#
+# Add one with: zonekit account add cloudflare --provider cloudflare
 
-name: cloudflare
-display_name: Cloudflare
-type: rest  # Uses generic REST adapter
+accounts:
+  cloudflare:
+    provider: "cloudflare"
 
-auth:
-  method: api_key
-  credentials:
-    api_key: "${CLOUDFLARE_API_KEY}"
-    email: "${CLOUDFLARE_EMAIL}"
+    # Cloudflare API token (Bearer auth). Create one at
+    # https://dash.cloudflare.com/profile/api-tokens with Zone.DNS edit
+    # permission (and Zone.Zone Settings / SSL, bot management,
+    # security.txt, rulesets edit if you use the zone-configuration
+    # capability).
+    api_token: "${CLOUDFLARE_API_TOKEN}"
 
-api:
-  base_url: "https://api.cloudflare.com/client/v4"
-  endpoints:
-    get_records: "/zones/{zone_id}/dns_records"
-    create_record: "/zones/{zone_id}/dns_records"
-    update_record: "/zones/{zone_id}/dns_records/{record_id}"
-    delete_record: "/zones/{zone_id}/dns_records/{record_id}"
-  headers:
-    X-Auth-Email: "${CLOUDFLARE_EMAIL}"
-    X-Auth-Key: "${CLOUDFLARE_API_KEY}"
-    Content-Type: "application/json"
-  timeout: 30
-  retries: 3
+    # Cloudflare account ID. Required unless token_scope is "user" -
+    # account-owned tokens (the common case) verify against
+    # /accounts/{account_id}/tokens/verify and some endpoints are
+    # account-scoped.
+    account_id: "${CLOUDFLARE_ACCOUNT_ID}"
 
-mappings:
-  request:
-    hostname: "name"
-    record_type: "type"
-    address: "content"
-    ttl: "ttl"
-    mx_pref: "priority"
-  response:
-    hostname: "name"
-    record_type: "type"
-    address: "content"
-    ttl: "ttl"
-    mx_pref: "priority"
-  list_path: "result"
+    # "account" (default) or "user". See pkg/config/config.go's
+    # TokenScope* constants.
+    token_scope: "account"
 
-settings:
-  # Cloudflare-specific settings
-  zone_id_required: true  # Need zone_id for API calls
-  proxied: false  # Default proxy setting
-
+    description: "Cloudflare account"
