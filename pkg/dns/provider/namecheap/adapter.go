@@ -184,6 +184,18 @@ func (p *NamecheapProvider) Capabilities() dnsprovider.ProviderCapabilities {
 		CanUpdateRecord: false,
 		CanDeleteRecord: false,
 		CanBulkReplace:  true,
+
+		// Namecheap has no equivalent of Cloudflare's zone-level
+		// settings, bot management, security.txt, redirect rules, or
+		// DNSSEC controls, and does not implement ZoneConfigurer.
+		// Reporting these explicitly (rather than relying on the zero
+		// value) lets a caller fail fast on "unsupported" instead of
+		// hitting a failed type assertion.
+		CanConfigureZoneSettings:  false,
+		CanConfigureBotManagement: false,
+		CanConfigureSecurityTXT:   false,
+		CanConfigureRedirectRules: false,
+		CanConfigureDNSSEC:        false,
 	}
 }
 

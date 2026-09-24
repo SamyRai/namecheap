@@ -20,6 +20,18 @@ type ProviderCapabilities struct {
 	CanUpdateRecord bool
 	CanDeleteRecord bool
 	CanBulkReplace  bool
+
+	// Zone-configuration capabilities. These describe support for the
+	// optional ZoneConfigurer interface (see zone_configurer.go). A
+	// provider that reports one of these true MUST also satisfy
+	// ZoneConfigurer via a type assertion; callers should check the flag
+	// before asserting so they fail fast with a clear "unsupported"
+	// error instead of a panic or a runtime type-assertion failure.
+	CanConfigureZoneSettings  bool
+	CanConfigureBotManagement bool
+	CanConfigureSecurityTXT   bool
+	CanConfigureRedirectRules bool
+	CanConfigureDNSSEC        bool
 }
 
 // Provider defines the interface that all DNS providers must implement

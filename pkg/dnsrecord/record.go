@@ -25,4 +25,5 @@ const (
 	RecordTypeTXT   = "TXT"
 	RecordTypeNS    = "NS"
 	RecordTypeSRV   = "SRV"
+	RecordTypeCAA   = "CAA"
 )
