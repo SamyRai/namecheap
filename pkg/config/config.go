@@ -8,17 +8,51 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// AccountConfig represents a single DNS provider account configuration
+// Provider name constants for AccountConfig.Provider / GetProvider().
+const (
+	ProviderNamecheap  = "namecheap"
+	ProviderCloudflare = "cloudflare"
+)
+
+// Cloudflare token-scope values for AccountConfig.TokenScope. They mirror
+// which Cloudflare token-verification endpoint the token was minted
+// against: an account-owned API token verifies at
+// /accounts/{account_id}/tokens/verify (the common case - 15 of our 17
+// zones use one), a user-owned token verifies at /user/tokens/verify.
+const (
+	TokenScopeAccount = "account"
+	TokenScopeUser    = "user"
+)
+
+// AccountConfig represents a single DNS provider account configuration.
+//
+// Fields are shared across provider types rather than nested per-provider
+// so that existing Namecheap configs (username/api_user/api_key/client_ip)
+// keep loading unchanged: Provider defaults to "namecheap" when absent.
+// Cloudflare accounts use a disjoint set of fields (APIToken, AccountID,
+// TokenScope) and leave the Namecheap-only fields empty.
 type AccountConfig struct {
 	// Provider specifies which DNS provider to use (e.g., "namecheap", "cloudflare")
 	// Defaults to "namecheap" if not specified for backward compatibility
 	Provider    string `yaml:"provider,omitempty" mapstructure:"provider,omitempty"`
-	Username    string `yaml:"username" mapstructure:"username"`
-	APIUser     string `yaml:"api_user" mapstructure:"api_user"`
-	APIKey      string `yaml:"api_key" mapstructure:"api_key"`
-	ClientIP    string `yaml:"client_ip" mapstructure:"client_ip"`
-	UseSandbox  bool   `yaml:"use_sandbox" mapstructure:"use_sandbox"`
-	Description string `yaml:"description" mapstructure:"description"`
+	Description string `yaml:"description,omitempty" mapstructure:"description,omitempty"`
+
+	// Namecheap fields.
+	Username   string `yaml:"username,omitempty" mapstructure:"username,omitempty"`
+	APIUser    string `yaml:"api_user,omitempty" mapstructure:"api_user,omitempty"`
+	APIKey     string `yaml:"api_key,omitempty" mapstructure:"api_key,omitempty"`
+	ClientIP   string `yaml:"client_ip,omitempty" mapstructure:"client_ip,omitempty"`
+	UseSandbox bool   `yaml:"use_sandbox,omitempty" mapstructure:"use_sandbox,omitempty"`
+
+	// Cloudflare fields.
+	// APIToken is a Cloudflare API token (Bearer auth).
+	APIToken string `yaml:"api_token,omitempty" mapstructure:"api_token,omitempty"`
+	// AccountID is the Cloudflare account ID. Required unless TokenScope
+	// is "user".
+	AccountID string `yaml:"account_id,omitempty" mapstructure:"account_id,omitempty"`
+	// TokenScope selects the token-verification endpoint: "account"
+	// (default) or "user". See the TokenScope* constants.
+	TokenScope string `yaml:"token_scope,omitempty" mapstructure:"token_scope,omitempty"`
 }
 
 // Config represents the complete configuration structure
@@ -258,7 +292,7 @@ func (m *Manager) createDefaultConfig() *Config {
 	return &Config{
 		Accounts: map[string]*AccountConfig{
 			"default": {
-				Provider:    "namecheap", // Default provider for backward compatibility
+				Provider:    ProviderNamecheap, // Default provider for backward compatibility
 				Username:    "your-provider-username",
 				APIUser:     "your-api-username",
 				APIKey:      "your-api-key-here",
@@ -279,7 +313,7 @@ func (m *Manager) migrateLegacyConfig() error {
 
 		// Create default account from legacy fields
 		defaultAccount := &AccountConfig{
-			Provider:    "namecheap", // Default provider for migrated legacy configs
+			Provider:    ProviderNamecheap, // Default provider for migrated legacy configs
 			Username:    m.config.Username,
 			APIUser:     m.config.APIUser,
 			APIKey:      m.config.APIKey,
@@ -316,13 +350,22 @@ func (m *Manager) migrateLegacyConfig() error {
 // GetProvider returns the provider name for an account, defaulting to "namecheap" for backward compatibility
 func (a *AccountConfig) GetProvider() string {
 	if a.Provider == "" {
-		return "namecheap" // Default provider for backward compatibility
+		return ProviderNamecheap // Default provider for backward compatibility
 	}
 	return a.Provider
 }
 
-// ValidateAccount validates an account configuration
+// ValidateAccount validates an account configuration for its provider.
 func (m *Manager) ValidateAccount(account *AccountConfig) error {
+	switch account.GetProvider() {
+	case ProviderCloudflare:
+		return validateCloudflareAccount(account)
+	default:
+		return validateNamecheapAccount(account)
+	}
+}
+
+func validateNamecheapAccount(account *AccountConfig) error {
 	if account.Username == "" {
 		return fmt.Errorf("username is required")
 	}
@@ -334,6 +377,24 @@ func (m *Manager) ValidateAccount(account *AccountConfig) error {
 	}
 	if account.ClientIP == "" {
 		return fmt.Errorf("client_ip is required")
+	}
+	return nil
+}
+
+func validateCloudflareAccount(account *AccountConfig) error {
+	if account.APIToken == "" {
+		return fmt.Errorf("api_token is required")
+	}
+
+	scope := account.TokenScope
+	if scope == "" {
+		scope = TokenScopeAccount
+	}
+	if scope != TokenScopeAccount && scope != TokenScopeUser {
+		return fmt.Errorf("token_scope must be %q or %q", TokenScopeAccount, TokenScopeUser)
+	}
+	if scope == TokenScopeAccount && account.AccountID == "" {
+		return fmt.Errorf("account_id is required unless token_scope is %q", TokenScopeUser)
 	}
 	return nil
 }
