@@ -156,7 +156,7 @@ The tool automatically detects configuration files in this priority order:
 | `dns clear <domain> --confirm [--dry-run]` | Clear all records. Refuses without `--confirm`; `--dry-run` previews without needing `--confirm` |
 | `dns bulk <domain> <file> --confirm [--dry-run]` | Bulk operations |
 | `dns ensure <domain> <host> <type> <value> [--ttl] [--mx-pref] [--dry-run]` | Idempotent create-or-update: reports `created`, `updated`, or `unchanged`. See below for the identity rule |
-| `dns import <domain> <file>` | Import zone file |
+| `dns import <domain> <file> --confirm [--dry-run]` | Import zone file (replaces ALL records) |
 | `dns export <domain> [file]` | Export zone file |
 
 `--dry-run` is supported on every mutating command above (`add`, `update`, `delete`, `clear`, `bulk`, `ensure`, `domain nameservers set`/`default`) and makes **no API writes**: it reports what would change (respecting `--output`) and exits without calling the provider.
@@ -177,6 +177,26 @@ The tool automatically detects configuration files in this priority order:
 ```
 
 `id` is included when the provider reports one (`omitempty` otherwise). `ttl`/`mx_pref` are omitted when zero.
+
+**Zone file format notes** (`dns export`/`dns import`, `pkg/dns/zonefile`):
+
+- Every record line always carries an explicit owner (`@` for the zone apex, or the
+  relative hostname). BIND master-file syntax lets a blank owner inherit the *previous*
+  line's owner, so a blank owner is never emitted -- it would silently relocate a record
+  onto whatever hostname preceded it.
+- Namecheap's `URL`/`URL301`/`FRAME` entries configure the registrar's own HTTP
+  redirect/frame forwarding; they are not DNS resource records. They are exported as
+  inert `; zonekit:url-redirect <owner> <type> "<value>"` comments, not as `IN URL...`
+  lines, and `dns import` restores them from that comment form.
+- `SOA`/`NS` are intentionally **not** exported. Namecheap's hosted-DNS API doesn't expose
+  real SOA data (serial/refresh/retry/expire) and manages the zone's NS set itself, so
+  there is nothing accurate to emit; a placeholder SOA/NS block would only be fabricated
+  data. The exported file documents this omission in its header comment.
+- Long `TXT` values (e.g. a 408-character DKIM key) are split into multiple quoted
+  `<character-string>`s of at most 255 bytes each, per RFC 1035; `dns import` reassembles
+  them into the original value.
+- `dns import` replaces **all** existing records for the domain (it lists what it parsed
+  and requires `--confirm` to apply).
 
 </details>
 
