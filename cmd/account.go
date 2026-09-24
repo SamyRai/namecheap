@@ -8,6 +8,9 @@ import (
 	"zonekit/pkg/config"
 )
 
+// accountAddProvider backs the `account add --provider` flag.
+var accountAddProvider string
+
 // accountCmd represents the account command
 var accountCmd = &cobra.Command{
 	Use:   "account",
@@ -48,34 +51,67 @@ var accountListCmd = &cobra.Command{
 				fmt.Printf("⚠️  %s: Error loading account details\n", accountName)
 				continue
 			}
-
-			// Show current account indicator
-			if accountName == configManager.GetCurrentAccountName() {
-				fmt.Printf("→ %s (current)\n", accountName)
-			} else {
-				fmt.Printf("  %s\n", accountName)
-			}
-
-			fmt.Printf("   Username: %s\n", account.Username)
-			fmt.Printf("   API User: %s\n", account.APIUser)
-			fmt.Printf("   Client IP: %s\n", account.ClientIP)
-			fmt.Printf("   Sandbox: %t\n", account.UseSandbox)
-			if account.Description != "" {
-				fmt.Printf("   Description: %s\n", account.Description)
-			}
-			fmt.Println()
+			printAccountSummary(accountName, account, accountName == configManager.GetCurrentAccountName())
 		}
 
 		return nil
 	},
 }
 
+// printAccountSummary prints the account list's per-account block. Field
+// selection depends on the account's provider: Namecheap accounts show
+// username/API user/client IP, Cloudflare accounts show the masked API
+// token and account ID.
+func printAccountSummary(name string, account *config.AccountConfig, isCurrent bool) {
+	if isCurrent {
+		fmt.Printf("→ %s (current)\n", name)
+	} else {
+		fmt.Printf("  %s\n", name)
+	}
+
+	fmt.Printf("   Provider: %s\n", account.GetProvider())
+	switch account.GetProvider() {
+	case config.ProviderCloudflare:
+		fmt.Printf("   API Token: %s\n", config.MaskAPIKey(account.APIToken))
+		fmt.Printf("   Account ID: %s\n", valueOrNotSet(account.AccountID))
+		fmt.Printf("   Token Scope: %s\n", tokenScopeOrDefault(account.TokenScope))
+	default:
+		fmt.Printf("   Username: %s\n", account.Username)
+		fmt.Printf("   API User: %s\n", account.APIUser)
+		fmt.Printf("   Client IP: %s\n", account.ClientIP)
+		fmt.Printf("   Sandbox: %t\n", account.UseSandbox)
+	}
+	if account.Description != "" {
+		fmt.Printf("   Description: %s\n", account.Description)
+	}
+	fmt.Println()
+}
+
+func valueOrNotSet(v string) string {
+	if v == "" {
+		return "(not set)"
+	}
+	return v
+}
+
+func tokenScopeOrDefault(scope string) string {
+	if scope == "" {
+		return config.TokenScopeAccount
+	}
+	return scope
+}
+
 // accountAddCmd represents the account add command
 var accountAddCmd = &cobra.Command{
 	Use:   "add [account-name]",
 	Short: "Add a new account configuration",
-	Long:  `Add a new DNS provider account configuration with an interactive prompt.`,
-	Args:  cobra.MaximumNArgs(1),
+	Long: `Add a new DNS provider account configuration with an interactive prompt.
+
+Use --provider to select the provider without an interactive prompt:
+
+  zonekit account add cloudflare --provider cloudflare
+  zonekit account add work --provider namecheap`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		configManager, err := config.NewManager()
 		if err != nil {
@@ -93,32 +129,23 @@ var accountAddCmd = &cobra.Command{
 			return fmt.Errorf("account '%s' already exists", accountName)
 		}
 
-		fmt.Printf("Adding new account: %s\n", accountName)
+		providerName, err := resolveProviderChoice(accountAddProvider)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Adding new account: %s (provider: %s)\n", accountName, providerName)
 		fmt.Println("================================")
 		fmt.Println()
 
-		// Interactive input
-		account := &config.AccountConfig{}
-
-		fmt.Print("Provider Username: ")
-		fmt.Scanln(&account.Username)
-
-		fmt.Print("API User: ")
-		fmt.Scanln(&account.APIUser)
-
-		fmt.Print("API Key: ")
-		fmt.Scanln(&account.APIKey)
-
-		fmt.Print("Client IP Address: ")
-		fmt.Scanln(&account.ClientIP)
-
-		var sandboxInput string
-		fmt.Print("Use Sandbox Environment? (y/N): ")
-		fmt.Scanln(&sandboxInput)
-		account.UseSandbox = strings.ToLower(sandboxInput) == "y" || strings.ToLower(sandboxInput) == "yes"
-
-		fmt.Print("Description (optional): ")
-		fmt.Scanln(&account.Description)
+		var account *config.AccountConfig
+		switch providerName {
+		case config.ProviderCloudflare:
+			account = promptCloudflareAccount(&config.AccountConfig{})
+		default:
+			account = promptNamecheapAccount(&config.AccountConfig{})
+		}
+		account.Provider = providerName
 
 		// Validate account
 		if err := configManager.ValidateAccount(account); err != nil {
@@ -135,7 +162,7 @@ var accountAddCmd = &cobra.Command{
 		// Ask if user wants to switch to this account
 		var switchInput string
 		fmt.Printf("Switch to account '%s'? (Y/n): ", accountName)
-		fmt.Scanln(&switchInput)
+		_, _ = fmt.Scanln(&switchInput)
 		if switchInput == "" || strings.ToLower(switchInput) == "y" || strings.ToLower(switchInput) == "yes" {
 			if err := configManager.SetCurrentAccount(accountName); err != nil {
 				return fmt.Errorf("failed to switch to account '%s': %w", accountName, err)
@@ -145,6 +172,98 @@ var accountAddCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// resolveProviderChoice returns the flag value if set, otherwise prompts
+// interactively, defaulting to Namecheap for backward compatibility.
+func resolveProviderChoice(flagValue string) (string, error) {
+	providerName := strings.ToLower(strings.TrimSpace(flagValue))
+	if providerName == "" {
+		fmt.Printf("Provider (%s/%s) [%s]: ", config.ProviderNamecheap, config.ProviderCloudflare, config.ProviderNamecheap)
+		var input string
+		_, _ = fmt.Scanln(&input)
+		providerName = strings.ToLower(strings.TrimSpace(input))
+		if providerName == "" {
+			providerName = config.ProviderNamecheap
+		}
+	}
+
+	if providerName != config.ProviderNamecheap && providerName != config.ProviderCloudflare {
+		return "", fmt.Errorf("unsupported provider %q (must be %q or %q)", providerName, config.ProviderNamecheap, config.ProviderCloudflare)
+	}
+	return providerName, nil
+}
+
+// promptNamecheapAccount interactively fills the Namecheap fields of an
+// account, using existing as the field defaults (so it doubles as the
+// edit-command prompt).
+func promptNamecheapAccount(existing *config.AccountConfig) *config.AccountConfig {
+	account := &config.AccountConfig{}
+
+	account.Username = promptWithDefault("Provider Username", existing.Username)
+	account.APIUser = promptWithDefault("API User", existing.APIUser)
+	account.APIKey = promptWithDefault(fmt.Sprintf("API Key [%s***]", maskedPrefix(existing.APIKey)), "")
+	if account.APIKey == "" {
+		account.APIKey = existing.APIKey
+	}
+	account.ClientIP = promptWithDefault("Client IP Address", existing.ClientIP)
+
+	sandboxInput := promptWithDefault("Use Sandbox Environment? (y/N)", "")
+	if sandboxInput == "" {
+		account.UseSandbox = existing.UseSandbox
+	} else {
+		account.UseSandbox = strings.EqualFold(sandboxInput, "y") || strings.EqualFold(sandboxInput, "yes")
+	}
+
+	account.Description = promptWithDefault("Description (optional)", existing.Description)
+	return account
+}
+
+// promptCloudflareAccount interactively fills the Cloudflare fields of
+// an account, using existing as the field defaults.
+func promptCloudflareAccount(existing *config.AccountConfig) *config.AccountConfig {
+	account := &config.AccountConfig{}
+
+	account.APIToken = promptWithDefault(fmt.Sprintf("Cloudflare API Token [%s***]", maskedPrefix(existing.APIToken)), "")
+	if account.APIToken == "" {
+		account.APIToken = existing.APIToken
+	}
+
+	scopeDefault := tokenScopeOrDefault(existing.TokenScope)
+	scopeInput := promptWithDefault(fmt.Sprintf("Token Scope (%s/%s)", config.TokenScopeAccount, config.TokenScopeUser), scopeDefault)
+	account.TokenScope = strings.ToLower(strings.TrimSpace(scopeInput))
+
+	if account.TokenScope == config.TokenScopeAccount {
+		account.AccountID = promptWithDefault("Cloudflare Account ID", existing.AccountID)
+	} else {
+		account.AccountID = existing.AccountID
+	}
+
+	account.Description = promptWithDefault("Description (optional)", existing.Description)
+	return account
+}
+
+// promptWithDefault prints "label [default]: ", reads one line, and
+// returns the typed value or default when the line is empty.
+func promptWithDefault(label, defaultValue string) string {
+	if defaultValue != "" {
+		fmt.Printf("%s [%s]: ", label, defaultValue)
+	} else {
+		fmt.Printf("%s: ", label)
+	}
+	var input string
+	_, _ = fmt.Scanln(&input)
+	if input == "" {
+		return defaultValue
+	}
+	return input
+}
+
+func maskedPrefix(secret string) string {
+	if len(secret) > 4 {
+		return secret[:4]
+	}
+	return secret
 }
 
 // accountSwitchCmd represents the account switch command
@@ -166,23 +285,19 @@ var accountSwitchCmd = &cobra.Command{
 			return fmt.Errorf("account '%s' not found: %w", accountName, err)
 		}
 
-		// Get current account for comparison
-		currentAccount, err := configManager.GetCurrentAccount()
-		if err != nil {
-			return fmt.Errorf("failed to get current account: %w", err)
-		}
-
 		if accountName == configManager.GetCurrentAccountName() {
 			fmt.Printf("Already using account '%s'\n", accountName)
 			return nil
 		}
+
+		previousName := configManager.GetCurrentAccountName()
 
 		// Switch account
 		if err := configManager.SetCurrentAccount(accountName); err != nil {
 			return fmt.Errorf("failed to switch to account '%s': %w", accountName, err)
 		}
 
-		fmt.Printf("✅ Switched from account '%s' to '%s'\n", currentAccount.Username, accountName)
+		fmt.Printf("✅ Switched from account '%s' to '%s'\n", previousName, accountName)
 		return nil
 	},
 }
@@ -206,16 +321,12 @@ var accountRemoveCmd = &cobra.Command{
 			return fmt.Errorf("account '%s' not found: %w", accountName, err)
 		}
 
-		// Get current account for comparison
-		currentAccount, err := configManager.GetCurrentAccount()
-		if err != nil {
-			return fmt.Errorf("failed to get current account: %w", err)
-		}
+		wasCurrent := accountName == configManager.GetCurrentAccountName()
 
 		// Confirm removal
 		fmt.Printf("Are you sure you want to remove account '%s'? (y/N): ", accountName)
 		var confirm string
-		fmt.Scanln(&confirm)
+		_, _ = fmt.Scanln(&confirm)
 		if strings.ToLower(confirm) != "y" && strings.ToLower(confirm) != "yes" {
 			fmt.Println("Aborted.")
 			return nil
@@ -229,10 +340,9 @@ var accountRemoveCmd = &cobra.Command{
 		fmt.Printf("✅ Account '%s' removed successfully!\n", accountName)
 
 		// Show new current account if it changed
-		if accountName == currentAccount.Username {
-			newCurrent, err := configManager.GetCurrentAccount()
-			if err == nil {
-				fmt.Printf("Switched to account '%s'\n", newCurrent.Username)
+		if wasCurrent {
+			if newCurrent := configManager.GetCurrentAccountName(); newCurrent != "" {
+				fmt.Printf("Switched to account '%s'\n", newCurrent)
 			}
 		}
 
@@ -276,11 +386,19 @@ var accountShowCmd = &cobra.Command{
 		fmt.Println("========================")
 		fmt.Println()
 
-		fmt.Printf("Username: %s\n", account.Username)
-		fmt.Printf("API User: %s\n", account.APIUser)
-		fmt.Printf("API Key: %s\n", config.MaskAPIKey(account.APIKey))
-		fmt.Printf("Client IP: %s\n", account.ClientIP)
-		fmt.Printf("Sandbox: %t\n", account.UseSandbox)
+		fmt.Printf("Provider: %s\n", account.GetProvider())
+		switch account.GetProvider() {
+		case config.ProviderCloudflare:
+			fmt.Printf("API Token: %s\n", config.MaskAPIKey(account.APIToken))
+			fmt.Printf("Account ID: %s\n", valueOrNotSet(account.AccountID))
+			fmt.Printf("Token Scope: %s\n", tokenScopeOrDefault(account.TokenScope))
+		default:
+			fmt.Printf("Username: %s\n", account.Username)
+			fmt.Printf("API User: %s\n", account.APIUser)
+			fmt.Printf("API Key: %s\n", config.MaskAPIKey(account.APIKey))
+			fmt.Printf("Client IP: %s\n", account.ClientIP)
+			fmt.Printf("Sandbox: %t\n", account.UseSandbox)
+		}
 		if account.Description != "" {
 			fmt.Printf("Description: %s\n", account.Description)
 		}
@@ -293,8 +411,11 @@ var accountShowCmd = &cobra.Command{
 var accountEditCmd = &cobra.Command{
 	Use:   "edit [account-name]",
 	Short: "Edit an existing account configuration",
-	Long:  `Edit an existing DNS provider account configuration with an interactive prompt.`,
-	Args:  cobra.MaximumNArgs(1),
+	Long: `Edit an existing DNS provider account configuration with an interactive prompt.
+
+The account's provider cannot be changed by editing; remove and re-add the
+account with a different --provider instead.`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		configManager, err := config.NewManager()
 		if err != nil {
@@ -315,65 +436,18 @@ var accountEditCmd = &cobra.Command{
 			return fmt.Errorf("account '%s' not found: %w", accountName, err)
 		}
 
-		fmt.Printf("Editing account: %s\n", accountName)
+		fmt.Printf("Editing account: %s (provider: %s)\n", accountName, existingAccount.GetProvider())
 		fmt.Println("================================")
 		fmt.Println()
 
-		// Interactive input with current values as defaults
-		account := &config.AccountConfig{}
-
-		fmt.Printf("Provider Username [%s]: ", existingAccount.Username)
-		var input string
-		fmt.Scanln(&input)
-		if input != "" {
-			account.Username = input
-		} else {
-			account.Username = existingAccount.Username
+		var account *config.AccountConfig
+		switch existingAccount.GetProvider() {
+		case config.ProviderCloudflare:
+			account = promptCloudflareAccount(existingAccount)
+		default:
+			account = promptNamecheapAccount(existingAccount)
 		}
-
-		fmt.Printf("API User [%s]: ", existingAccount.APIUser)
-		fmt.Scanln(&input)
-		if input != "" {
-			account.APIUser = input
-		} else {
-			account.APIUser = existingAccount.APIUser
-		}
-
-		masked := existingAccount.APIKey
-		if len(existingAccount.APIKey) > 4 {
-			masked = existingAccount.APIKey[:4]
-		}
-		fmt.Printf("API Key [%s***]: ", masked)
-		fmt.Scanln(&input)
-		if input != "" {
-			account.APIKey = input
-		} else {
-			account.APIKey = existingAccount.APIKey
-		}
-
-		fmt.Printf("Client IP Address [%s]: ", existingAccount.ClientIP)
-		fmt.Scanln(&input)
-		if input != "" {
-			account.ClientIP = input
-		} else {
-			account.ClientIP = existingAccount.ClientIP
-		}
-
-		fmt.Printf("Use Sandbox Environment? [%t] (y/N): ", existingAccount.UseSandbox)
-		fmt.Scanln(&input)
-		if input != "" {
-			account.UseSandbox = strings.ToLower(input) == "y" || strings.ToLower(input) == "yes"
-		} else {
-			account.UseSandbox = existingAccount.UseSandbox
-		}
-
-		fmt.Printf("Description [%s]: ", existingAccount.Description)
-		fmt.Scanln(&input)
-		if input != "" {
-			account.Description = input
-		} else {
-			account.Description = existingAccount.Description
-		}
+		account.Provider = existingAccount.GetProvider()
 
 		// Validate account
 		if err := configManager.ValidateAccount(account); err != nil {
@@ -398,4 +472,6 @@ func init() {
 	accountCmd.AddCommand(accountRemoveCmd)
 	accountCmd.AddCommand(accountShowCmd)
 	accountCmd.AddCommand(accountEditCmd)
+
+	accountAddCmd.Flags().StringVar(&accountAddProvider, "provider", "", "DNS provider for this account (namecheap or cloudflare)")
 }
