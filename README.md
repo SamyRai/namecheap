@@ -105,6 +105,17 @@ The tool automatically detects configuration files in this priority order:
 ## Commands
 
 <details>
+<summary><strong>Global flags</strong></summary>
+
+| Flag | Description |
+|------|-------------|
+| `--output`, `-o` | Output format: `table` (default, human-readable) \| `json` \| `yaml`. Every list/read command below emits stable, snake_case fields in json/yaml mode. Diagnostics (`Using account: ...`, `Using config file: ...`) always go to stderr, never stdout, in every mode, so stdout stays safe to pipe or parse. On error, table mode prints `Error: <message>` and json/yaml mode prints `{"error": "<message>"}` (or the YAML equivalent) — both to stderr, both with a non-zero exit code. |
+| `--account` | Use a specific account instead of the current one |
+| `--config` | Use a specific config file |
+
+</details>
+
+<details>
 <summary><strong>Account Management</strong></summary>
 
 | Command | Description |
@@ -123,13 +134,13 @@ The tool automatically detects configuration files in this priority order:
 
 | Command | Description |
 |---------|-------------|
-| `domain list` | List all domains |
-| `domain info <domain>` | Get domain details |
+| `domain list` | List all domains (`--output json\|yaml` supported) |
+| `domain info <domain>` | Get domain details (`--output json\|yaml` supported) |
 | `domain check <domain>` | Check availability |
 | `domain renew <domain> [years]` | Renew domain |
-| `domain nameservers get <domain>` | Get nameservers |
-| `domain nameservers set <domain> <ns1> [ns2]...` | Set nameservers |
-| `domain nameservers default <domain>` | Reset to default |
+| `domain nameservers get <domain>` | Get nameservers (`--output json\|yaml` supported) |
+| `domain nameservers set <domain> <ns1> [ns2]... [--dry-run]` | Set nameservers |
+| `domain nameservers default <domain> [--dry-run]` | Reset to default |
 
 </details>
 
@@ -138,14 +149,34 @@ The tool automatically detects configuration files in this priority order:
 
 | Command | Description |
 |---------|-------------|
-| `dns list <domain>` | List DNS records |
-| `dns add <domain> <host> <type> <value>` | Add DNS record |
-| `dns update <domain> <host> <type> <value>` | Update DNS record |
-| `dns delete <domain> <host> <type>` | Delete DNS record |
-| `dns clear <domain>` | Clear all records |
-| `dns bulk <domain> <file>` | Bulk operations |
+| `dns list <domain> [--type T] [--name N]` | List DNS records. `--name` is an exact, case-insensitive hostname match (not a substring match) |
+| `dns add <domain> <host> <type> <value> [--ttl] [--mx-pref] [--dry-run]` | Add DNS record |
+| `dns update <domain> <host> <type> <value> [--match-value] [--dry-run]` | Update DNS record |
+| `dns delete <domain> <host> <type> [--dry-run]` | Delete DNS record |
+| `dns clear <domain> --confirm [--dry-run]` | Clear all records. Refuses without `--confirm`; `--dry-run` previews without needing `--confirm` |
+| `dns bulk <domain> <file> --confirm [--dry-run]` | Bulk operations |
+| `dns ensure <domain> <host> <type> <value> [--ttl] [--mx-pref] [--dry-run]` | Idempotent create-or-update: reports `created`, `updated`, or `unchanged`. See below for the identity rule |
 | `dns import <domain> <file>` | Import zone file |
 | `dns export <domain> [file]` | Export zone file |
+
+`--dry-run` is supported on every mutating command above (`add`, `update`, `delete`, `clear`, `bulk`, `ensure`, `domain nameservers set`/`default`) and makes **no API writes**: it reports what would change (respecting `--output`) and exits without calling the provider.
+
+**`dns ensure` identity rule:** for `MX` and `TXT` records, `(hostname, type, value)` identifies the record — a hostname can legitimately carry several of each at once (multiple MX priorities; SPF/DMARC/verification TXT records), so a value that doesn't match an existing record is added alongside the others rather than overwriting one of them. For every other type, `(hostname, type)` identifies the record, matching normal DNS practice of one A/AAAA/CNAME/NS per hostname; if more than one already exists, `ensure` refuses rather than guess which to update.
+
+**JSON output schema** (stable, snake_case; same shape in `--output yaml`):
+
+```jsonc
+// dns list --output json
+[
+  { "hostname": "@", "type": "MX", "value": "mail.example.com", "ttl": 1800, "mx_pref": 10 },
+  { "hostname": "www", "type": "A", "value": "192.168.1.1" }
+]
+
+// dns ensure --output json
+{ "status": "created", "record": { "hostname": "www", "type": "A", "value": "192.168.1.1", "ttl": 1800 } }
+```
+
+`id` is included when the provider reports one (`omitempty` otherwise). `ttl`/`mx_pref` are omitted when zero.
 
 </details>
 
