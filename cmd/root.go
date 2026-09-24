@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"zonekit/internal/cmdutil"
 	"zonekit/pkg/config"
 	"zonekit/pkg/dns/provider/autodiscover"
 	"zonekit/pkg/plugin"
@@ -16,6 +17,7 @@ import (
 
 var cfgFile string
 var accountName string
+var outputFormat string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -32,12 +34,55 @@ This tool allows you to:
 
 Current version: ` + version.Version + ` (pre-1.0.0)`,
 	Version: version.String(),
+	// PersistentPreRunE runs for every command (including subcommands) before
+	// their own RunE. It rejects an unrecognized --output value up front so
+	// commands don't each need to validate it themselves.
+	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		if !cmdutil.IsValidOutputFormat(outputFormat) {
+			return fmt.Errorf("invalid --output value %q (must be one of: %s)",
+				outputFormat, joinOutputFormats())
+		}
+		// Keep the usage banner for humans in table mode, but suppress it in
+		// json/yaml mode so a failure is a single parseable object on stderr.
+		cmd.Root().SilenceUsage = outputFormat != cmdutil.OutputTable
+		return nil
+	},
+}
+
+func joinOutputFormats() string {
+	out := ""
+	for i, f := range cmdutil.ValidOutputFormats {
+		if i > 0 {
+			out += ", "
+		}
+		out += f
+	}
+	return out
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
+//
+// Errors are reported here (not by main), because the correct format for an
+// error (plain text vs. the json/yaml error envelope) depends on the
+// --output flag, which is only known once cobra has parsed it. Cobra's own
+// error/usage printing is silenced so this is the single place an error is
+// written.
 func Execute() error {
-	return rootCmd.Execute()
+	rootCmd.SilenceErrors = true
+	rootCmd.SilenceUsage = true
+
+	err := rootCmd.Execute()
+	if err != nil {
+		cmdutil.WriteError(os.Stderr, outputFormat, err)
+	}
+	return err
+}
+
+// OutputFormat returns the resolved --output value ("table", "json", or
+// "yaml") for use by command bodies that need to branch on it.
+func OutputFormat() string {
+	return outputFormat
 }
 
 func init() {
@@ -46,6 +91,8 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.zonekit.yaml)")
 	rootCmd.PersistentFlags().StringVar(&accountName, "account", "", "use specific account (default: current account)")
+	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", cmdutil.OutputTable,
+		"output format: table|json|yaml (json/yaml use stable snake_case fields; errors go to stderr)")
 
 	// Legacy flags for backward compatibility (deprecated)
 	rootCmd.PersistentFlags().String("username", "", "Namecheap username (deprecated: use account management)")

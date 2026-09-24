@@ -1,15 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"zonekit/cmd"
 )
 
 func main() {
+	// cmd.Execute prints the error itself (format depends on --output, which
+	// only cobra has parsed by then), so main only needs to set the exit code.
 	if err := cmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }

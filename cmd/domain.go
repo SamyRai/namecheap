@@ -10,6 +10,44 @@ import (
 	"zonekit/pkg/domain"
 )
 
+// domainDTO is the stable, snake_case wire shape for a domain in json/yaml
+// output (O1).
+type domainDTO struct {
+	Name       string `json:"name" yaml:"name"`
+	User       string `json:"user,omitempty" yaml:"user,omitempty"`
+	Created    string `json:"created,omitempty" yaml:"created,omitempty"`
+	Expires    string `json:"expires,omitempty" yaml:"expires,omitempty"`
+	IsExpired  bool   `json:"is_expired" yaml:"is_expired"`
+	IsLocked   bool   `json:"is_locked" yaml:"is_locked"`
+	AutoRenew  bool   `json:"auto_renew" yaml:"auto_renew"`
+	WhoisGuard string `json:"whois_guard,omitempty" yaml:"whois_guard,omitempty"`
+	IsPremium  bool   `json:"is_premium" yaml:"is_premium"`
+	IsOurDNS   bool   `json:"is_our_dns" yaml:"is_our_dns"`
+}
+
+func newDomainDTO(d domain.Domain) domainDTO {
+	return domainDTO{
+		Name:       d.Name,
+		User:       d.User,
+		Created:    d.Created,
+		Expires:    d.Expires,
+		IsExpired:  d.IsExpired,
+		IsLocked:   d.IsLocked,
+		AutoRenew:  d.AutoRenew,
+		WhoisGuard: d.WhoisGuard,
+		IsPremium:  d.IsPremium,
+		IsOurDNS:   d.IsOurDNS,
+	}
+}
+
+func newDomainDTOs(domains []domain.Domain) []domainDTO {
+	out := make([]domainDTO, len(domains))
+	for i, d := range domains {
+		out[i] = newDomainDTO(d)
+	}
+	return out
+}
+
 // domainCmd represents the domain command
 var domainCmd = &cobra.Command{
 	Use:   "domain",
@@ -23,6 +61,8 @@ var domainListCmd = &cobra.Command{
 	Short: "List all domains",
 	Long:  `List all domains in your account with their details.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		format := OutputFormat()
+
 		// Get current account configuration
 		accountConfig, err := GetCurrentAccount()
 		if err != nil {
@@ -40,6 +80,10 @@ var domainListCmd = &cobra.Command{
 		domains, err := domainService.ListDomains()
 		if err != nil {
 			return fmt.Errorf("failed to list domains: %w", err)
+		}
+
+		if format != cmdutil.OutputTable {
+			return cmdutil.WriteResult(os.Stdout, format, newDomainDTOs(domains))
 		}
 
 		if len(domains) == 0 {
@@ -82,6 +126,7 @@ var domainInfoCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domainName := args[0]
+		format := OutputFormat()
 
 		// Validate domain
 		if err := domain.ValidateDomain(domainName); err != nil {
@@ -105,6 +150,10 @@ var domainInfoCmd = &cobra.Command{
 		domainInfo, err := domainService.GetDomainInfo(domainName)
 		if err != nil {
 			return fmt.Errorf("failed to get domain info: %w", err)
+		}
+
+		if format != cmdutil.OutputTable {
+			return cmdutil.WriteResult(os.Stdout, format, newDomainDTO(*domainInfo))
 		}
 
 		fmt.Printf("Domain: %s\n", domainInfo.Name)
@@ -179,6 +228,7 @@ var domainNameserversGetCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domainName := args[0]
+		format := OutputFormat()
 
 		// Validate domain
 		if err := domain.ValidateDomain(domainName); err != nil {
@@ -204,6 +254,13 @@ var domainNameserversGetCmd = &cobra.Command{
 			return fmt.Errorf("failed to get nameservers: %w", err)
 		}
 
+		if format != cmdutil.OutputTable {
+			return cmdutil.WriteResult(os.Stdout, format, map[string]interface{}{
+				jsonKeyDomain: domainName,
+				"nameservers": nameservers,
+			})
+		}
+
 		fmt.Printf("Nameservers for %s:\n", domainName)
 		for i, ns := range nameservers {
 			fmt.Printf("%d. %s\n", i+1, ns)
@@ -222,6 +279,8 @@ var domainNameserversSetCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domainName := args[0]
 		nameservers := args[1:]
+		format := OutputFormat()
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 		// Get current account configuration
 		accountConfig, err := GetCurrentAccount()
@@ -236,10 +295,33 @@ var domainNameserversSetCmd = &cobra.Command{
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
 
+		if dryRun {
+			if format != cmdutil.OutputTable {
+				return cmdutil.WriteResult(os.Stdout, format, map[string]interface{}{
+					jsonKeyDomain: domainName,
+					"nameservers": nameservers,
+					jsonKeyStatus: "would-set",
+				})
+			}
+			fmt.Printf("DRY RUN: would set nameservers for %s:\n", domainName)
+			for i, ns := range nameservers {
+				fmt.Printf("%d. %s\n", i+1, ns)
+			}
+			return nil
+		}
+
 		domainService := domain.NewService(client)
 		err = domainService.SetNameservers(domainName, nameservers)
 		if err != nil {
 			return fmt.Errorf("failed to set nameservers: %w", err)
+		}
+
+		if format != cmdutil.OutputTable {
+			return cmdutil.WriteResult(os.Stdout, format, map[string]interface{}{
+				jsonKeyDomain: domainName,
+				"nameservers": nameservers,
+				jsonKeyStatus: "set",
+			})
 		}
 
 		fmt.Printf("Successfully set nameservers for %s:\n", domainName)
@@ -259,6 +341,8 @@ var domainNameserversDefaultCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domainName := args[0]
+		format := OutputFormat()
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 		// Validate domain
 		if err := domain.ValidateDomain(domainName); err != nil {
@@ -278,10 +362,28 @@ var domainNameserversDefaultCmd = &cobra.Command{
 		}
 		cmdutil.DisplayAccountInfo(accountConfig)
 
+		if dryRun {
+			if format != cmdutil.OutputTable {
+				return cmdutil.WriteResult(os.Stdout, format, map[string]string{
+					jsonKeyDomain: domainName,
+					jsonKeyStatus: "would-reset-to-provider-dns",
+				})
+			}
+			fmt.Printf("DRY RUN: would set %s to use provider DNS servers.\n", domainName)
+			return nil
+		}
+
 		domainService := domain.NewService(client)
 		err = domainService.SetToNamecheapDNS(domainName)
 		if err != nil {
 			return fmt.Errorf("failed to set to provider DNS: %w", err)
+		}
+
+		if format != cmdutil.OutputTable {
+			return cmdutil.WriteResult(os.Stdout, format, map[string]string{
+				jsonKeyDomain: domainName,
+				jsonKeyStatus: "reset-to-provider-dns",
+			})
 		}
 
 		fmt.Printf("Successfully set %s to use provider DNS servers.\n", domainName)
@@ -353,4 +455,7 @@ func init() {
 	domainNameserversCmd.AddCommand(domainNameserversGetCmd)
 	domainNameserversCmd.AddCommand(domainNameserversSetCmd)
 	domainNameserversCmd.AddCommand(domainNameserversDefaultCmd)
+
+	domainNameserversSetCmd.Flags().Bool("dry-run", false, "Show what would be set without making any API writes")
+	domainNameserversDefaultCmd.Flags().Bool("dry-run", false, "Show what would change without making any API writes")
 }
